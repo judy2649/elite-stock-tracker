@@ -12,32 +12,35 @@ import cookieParser from "cookie-parser";
 
 dotenv.config();
 
-// Initialize Firebase Admin
-let firebaseAdminConfig: any = {};
+// Initialize Firebase Admin (Optional & Protected)
+let firestore: any = null;
+let authAdmin: any = null;
+
 try {
+  let firebaseAdminConfig: any = {};
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
   if (fs.existsSync(configPath)) {
     firebaseAdminConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
   }
-} catch (err) {
-  console.error("Error reading firebase-applet-config.json:", err);
+
+  const projectId = process.env.FIREBASE_PROJECT_ID || firebaseAdminConfig.projectId;
+  const databaseId = process.env.FIREBASE_DATABASE_ID || firebaseAdminConfig.firestoreDatabaseId;
+
+  if (projectId && !getApps().length) {
+    console.log(`Initializing Firebase Admin for Project: ${projectId}`);
+    initializeApp({ projectId });
+    firestore = getFirestore(databaseId);
+    authAdmin = getAuth();
+  } else {
+    console.warn("No Firebase Project ID found. Running in Local Auth mode only.");
+  }
+} catch (err: any) {
+  console.error("Firebase Admin initialization skipped or failed:", err.message);
 }
 
-const projectId = process.env.FIREBASE_PROJECT_ID || firebaseAdminConfig.projectId;
-const databaseId = process.env.FIREBASE_DATABASE_ID || firebaseAdminConfig.firestoreDatabaseId;
-
-if (!getApps().length) {
-  console.log(`Initializing Firebase Admin for Project: ${projectId}`);
-  initializeApp({
-    projectId: projectId,
-  });
-}
-
-const firestore = getFirestore(databaseId);
-const authAdmin = getAuth();
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret_for_development_purposes";
 
-// Local DB Fallback (for "Bypass Firebase" mode or failures)
+// Local DB Persistence
 const LOCAL_DB_PATH = path.join(process.cwd(), "local_db.json");
 if (!fs.existsSync(LOCAL_DB_PATH)) {
   fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify({ custom_users: {}, users: {} }, null, 2));
@@ -46,36 +49,43 @@ if (!fs.existsSync(LOCAL_DB_PATH)) {
 const getLocalDb = () => JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
 const saveLocalDb = (data: any) => fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
 
-// Helper to call Firestore with fallback
+// Helper to call Firestore with strict fallback
 const getCollection = (name: string) => {
   return {
     doc: (id: string) => {
       return {
         get: async () => {
-          try {
-            const res = await firestore.collection(name).doc(id).get();
-            return res;
-          } catch (e: any) {
-            console.error(`[AUTH DIAGNOSTIC] Firestore GET failed for ${name}/${id}:`, e.message);
-            const data = getLocalDb();
-            const record = data[name]?.[id];
-            return {
-              exists: !!record,
-              data: () => record,
-              id
-            };
+          if (firestore) {
+            try {
+              const res = await firestore.collection(name).doc(id).get();
+              return res;
+            } catch (e: any) {
+              console.error(`Firestore GET error for ${name}/${id}:`, e.message);
+            }
           }
+          // Fallback
+          const data = getLocalDb();
+          const record = data[name]?.[id];
+          return {
+            exists: !!record,
+            data: () => record,
+            id
+          };
         },
         set: async (val: any) => {
-          try {
-            await firestore.collection(name).doc(id).set(val);
-          } catch (e: any) {
-            console.error(`[AUTH DIAGNOSTIC] Firestore SET failed for ${name}/${id}:`, e.message);
-            const data = getLocalDb();
-            if (!data[name]) data[name] = {};
-            data[name][id] = { ...val, updatedAt: new Date().toISOString() };
-            saveLocalDb(data);
+          if (firestore) {
+            try {
+              await firestore.collection(name).doc(id).set(val);
+              return;
+            } catch (e: any) {
+              console.error(`Firestore SET error for ${name}/${id}:`, e.message);
+            }
           }
+          // Fallback
+          const data = getLocalDb();
+          if (!data[name]) data[name] = {};
+          data[name][id] = { ...val, updatedAt: new Date().toISOString() };
+          saveLocalDb(data);
         }
       };
     }

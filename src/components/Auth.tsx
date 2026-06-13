@@ -24,24 +24,36 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
   const [fullName, setFullName] = useState('');
 
   const handleGoogleLogin = async () => {
+    if (!googleProvider || typeof signInWithPopup !== 'function') {
+      setError("Google Login is currently unavailable. Please use email/password.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
-      // Ensure user document exists in 'users' collection
-      const userRef = doc(db, 'users', user.email!);
-      const userDoc = await getDoc(userRef);
+      // Only attempt Firestore sync if db is valid
+      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
       
-      if (!userDoc.exists()) {
-        await setDoc(userRef, {
-          userId: user.email,
-          fullName: user.displayName || user.email?.split('@')[0],
-          email: user.email,
-          role: 'Sales Cashier', // Default role
-          createdAt: serverTimestamp()
-        });
+      if (isFirebaseAvailable) {
+        try {
+          const userRef = doc(db, 'users', user.email!);
+          const userDoc = await getDoc(userRef);
+          
+          if (!userDoc.exists()) {
+            await setDoc(userRef, {
+              userId: user.email,
+              fullName: user.displayName || user.email?.split('@')[0],
+              email: user.email,
+              role: 'Sales Cashier',
+              createdAt: serverTimestamp()
+            });
+          }
+        } catch (dbErr) {
+          console.warn("Firestore user sync failed, continuing with local session.");
+        }
       }
 
       onAuthSuccess({

@@ -1,12 +1,32 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+let app: any;
+let db: any;
+let auth: any;
+let googleProvider: any;
+
+try {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
+  }
+  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+} catch (error: any) {
+  console.warn("Firebase Client failed to initialize. Running in Local Mode.", error.message);
+  // Provide mocks to prevent crashes, but they won't actually "work" for network calls
+  app = {};
+  db = {}; 
+  auth = { currentUser: null };
+  googleProvider = {};
+}
+
+export { app, db, auth, googleProvider };
 
 export enum OperationType {
   CREATE = 'create',
@@ -68,4 +88,5 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+// testConnection();
+

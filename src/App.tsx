@@ -94,6 +94,9 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
+    // Only set up Firestore listeners if db is properly initialized
+    const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
+
     const loadLocal = (key: string, setter: any) => {
       const stored = localStorage.getItem(`elite_beauty_${key}`);
       if (stored) {
@@ -110,6 +113,12 @@ export default function App() {
     loadLocal('sales', setSales);
     loadLocal('expenses', setExpenses);
     loadLocal('customers', setCustomers);
+
+    if (!isFirebaseAvailable) {
+      console.log("Firebase not available. Continuing in Local Storage mode.");
+      setIsSyncing(false);
+      return;
+    }
 
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Product));
@@ -202,8 +211,11 @@ export default function App() {
   };
 
   // MUTATORS (Mapped to Firestore with Local Failover)
+  const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
+
   const handleAddProduct = async (newProduct: Product) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...data } = newProduct;
       await addDoc(collection(db, 'products'), data);
     } catch (error) {
@@ -216,6 +228,7 @@ export default function App() {
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...data } = updatedProduct;
       await updateDoc(doc(db, 'products', id), data);
     } catch (error) {
@@ -228,6 +241,7 @@ export default function App() {
 
   const handleDeleteProduct = async (productId: string) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       await deleteDoc(doc(db, 'products', productId));
     } catch (error) {
       console.warn("Firestore DELETE failed, bypassing to local.");
@@ -239,6 +253,7 @@ export default function App() {
 
   const handleRecordSale = async (newSale: Sale) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...saleData } = newSale;
       await addDoc(collection(db, 'sales'), saleData);
 
@@ -268,6 +283,7 @@ export default function App() {
 
   const handleSettleDebt = async (customerName: string, settleAmount: number) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       let remainingPayment = settleAmount;
       const relevantSales = sales.filter(s => s.customerName === customerName && s.balanceDue > 0)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -304,6 +320,7 @@ export default function App() {
 
   const handleAddCustomer = async (newCustomer: Customer) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...data } = newCustomer;
       await addDoc(collection(db, 'customers'), data);
     } catch (error) {
@@ -316,6 +333,7 @@ export default function App() {
 
   const handleAddExpense = async (newExpense: Expense) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...data } = newExpense;
       await addDoc(collection(db, 'expenses'), data);
     } catch (error) {
@@ -328,6 +346,7 @@ export default function App() {
 
   const handleDeleteExpense = async (expenseId: string) => {
     try {
+      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       await deleteDoc(doc(db, 'expenses', expenseId));
     } catch (error) {
       console.warn("Firestore DELETE EXPENSE failed, bypassing to local.");
