@@ -60,10 +60,13 @@ const getCollection = (name: string) => {
               const res = await firestore.collection(name).doc(id).get();
               return res;
             } catch (e: any) {
-              console.error(`Firestore GET error for ${name}/${id}:`, e.message);
+              // Only log if it's not a standard 'Not Found' error
+              if (!e.message.includes("5 NOT_FOUND")) {
+                console.warn(`Firestore GET suppressed for ${name}/${id}: ${e.message}`);
+              }
             }
           }
-          // Fallback
+          // Fallback to Local DB
           const data = getLocalDb();
           const record = data[name]?.[id];
           return {
@@ -78,10 +81,12 @@ const getCollection = (name: string) => {
               await firestore.collection(name).doc(id).set(val);
               return;
             } catch (e: any) {
-              console.error(`Firestore SET error for ${name}/${id}:`, e.message);
+              if (!e.message.includes("5 NOT_FOUND")) {
+                console.warn(`Firestore SET suppressed for ${name}/${id}: ${e.message}`);
+              }
             }
           }
-          // Fallback
+          // Fallback to Local DB
           const data = getLocalDb();
           if (!data[name]) data[name] = {};
           data[name][id] = { ...val, updatedAt: new Date().toISOString() };
@@ -145,10 +150,12 @@ app.post("/api/auth/register", async (req, res) => {
     });
 
     let firebaseToken = "";
-    try {
-      firebaseToken = await authAdmin.createCustomToken(email);
-    } catch (e) {
-      console.warn("AuthAdmin failed to create custom token, continuing without it.");
+    if (authAdmin) {
+      try {
+        firebaseToken = await authAdmin.createCustomToken(email);
+      } catch (e) {
+        // Silent fail for token generation in local-only environments
+      }
     }
 
     const token = jwt.sign({ email, firebaseToken }, JWT_SECRET, { expiresIn: "7d" });
@@ -196,10 +203,12 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     let firebaseToken = "";
-    try {
-      firebaseToken = await authAdmin.createCustomToken(email);
-    } catch (e) {
-      console.warn("AuthAdmin failed to create custom token during login.");
+    if (authAdmin) {
+      try {
+        firebaseToken = await authAdmin.createCustomToken(email);
+      } catch (e) {
+        // Silent fail
+      }
     }
 
     const token = jwt.sign({ email, firebaseToken }, JWT_SECRET, { expiresIn: "7d" });
@@ -231,9 +240,11 @@ app.get("/api/auth/me", async (req, res) => {
     if (!doc.exists) return res.status(401).json({ message: "User not found" });
 
     let firebaseToken = "";
-    try {
-      firebaseToken = await authAdmin.createCustomToken(decoded.email);
-    } catch (e) {}
+    if (authAdmin) {
+      try {
+        firebaseToken = await authAdmin.createCustomToken(decoded.email);
+      } catch (e) {}
+    }
 
     const { password: _, ...userWithoutPassword } = doc.data() as any;
     res.json({ ...userWithoutPassword, firebaseToken });
