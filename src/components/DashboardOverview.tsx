@@ -10,12 +10,7 @@ import {
   Sparkles, 
   Calendar,
   Eye,
-  BadgeAlert,
-  Brain,
-  Copy,
-  Check,
-  Mail,
-  RefreshCw
+  BadgeAlert
 } from 'lucide-react';
 import { Product, Sale, Expense } from '../types';
 import { formatUGX, isOutOfStock, isLowStock, getExpiryStatus } from '../utils';
@@ -35,51 +30,6 @@ export default function DashboardOverview({
   onNavigateToTab,
   onSetProductFilter
 }: DashboardOverviewProps) {
-
-  // Local AI states
-  const [aiReport, setAiReport] = useState<any | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [aiMessage, setAiMessage] = useState('Consulting central store inventory statistics...');
-
-  const triggerAiForecast = async () => {
-    setLoadingAi(true);
-    setCopied(false);
-    
-    const messages = [
-      'Reading current inventory batch codes and shade velocities...',
-      'Matching Kampala sales trends with near-expiry cosmetics thresholds...',
-      'Drafting restock order proforma drafts for wholesale suppliers...',
-      'Synthesizing predictions using Gemini 3.5 Flash...'
-    ];
-    let msgIdx = 0;
-    setAiMessage(messages[0]);
-    const timer = setInterval(() => {
-      msgIdx = (msgIdx + 1) % messages.length;
-      setAiMessage(messages[msgIdx]);
-    }, 2000);
-
-    try {
-      const response = await fetch('/api/ai/forecast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products, sales, expenses })
-      });
-      const data = await response.json();
-      setAiReport(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      clearInterval(timer);
-      setLoadingAi(false);
-    }
-  };
-
-  const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3050);
-  };
 
   // Calculations
   const totalProducts = products.length;
@@ -256,115 +206,6 @@ export default function DashboardOverview({
             </div>
           </div>
         </motion.div>
-      </div>
-
-      {/* ELITE BEAUTY INTUITIVE GEMINI AI ADVISOR */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-5 shadow-xs transition duration-200">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2.5 bg-royal-50 text-royal-700 rounded-lg shrink-0 border border-royal-100">
-              <Brain className="w-5 h-5 text-royal-700" />
-            </span>
-            <div>
-              <h3 className="font-display text-base font-bold text-zinc-900 flex items-center gap-1.5">
-                Elite Beauty AI Smart Advisor
-                <span className="bg-gold-100 text-gold-950 text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase border border-gold-300/30">Gemini powered</span>
-              </h3>
-              <p className="text-xs text-zinc-500">Instant predictive stock forecasting, luxury shade recommendations, and automated restocking formats</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={triggerAiForecast}
-            disabled={loadingAi}
-            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition shrink-0 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer border border-zinc-800"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingAi ? 'animate-spin' : ''}`} />
-            {aiReport ? 'Re-Run Insights' : '⚡ Run AI Stock Trend Forecasting'}
-          </button>
-        </div>
-
-        {/* LOADING ANIMATED LOADER */}
-        {loadingAi && (
-          <div className="p-10 border border-dashed border-zinc-200 bg-zinc-50 rounded-xl text-center space-y-3 animate-fade-in">
-            <div className="w-10 h-10 border-4 border-royal-750 border-t-transparent animate-spin mx-auto rounded-full"></div>
-            <p className="font-mono text-xs text-royal-950 animate-pulse font-bold">{aiMessage}</p>
-            <p className="text-[10px] text-zinc-400">Deep-learning analytics scan of cosmetics stock quantities is initiated...</p>
-          </div>
-        )}
-
-        {/* AI INSIGHTS REPORT DATA */}
-        {!loadingAi && aiReport && (
-          <div className="space-y-4 pt-1 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Demand Forecasting Unit */}
-              <div className="bg-royal-50/20 border border-royal-100/50 p-4 rounded-xl space-y-2">
-                <span className="text-[9px] font-extrabold text-royal-800 uppercase tracking-widest block font-sans">1. Demand Forecasting</span>
-                <p className="text-xs text-zinc-700 font-sans leading-relaxed">
-                  {aiReport.demandForecast || "Higher volume shifts projected for long-wear pigments and skincare bundles next fortnight due to seasonal wedding celebrations."}
-                </p>
-              </div>
-
-              {/* Bundle/Expiring Clearance Unit */}
-              <div className="bg-gold-50/30 border border-gold-200/40 p-4 rounded-xl space-y-2">
-                <span className="text-[9px] font-extrabold text-gold-700 uppercase tracking-widest block font-sans">2. Promotional Combos</span>
-                <p className="text-xs text-zinc-700 font-sans leading-relaxed">
-                  {aiReport.slowMoversOffers || "Create matching lip stain lipstick shade sets with expiring lotions to secure quick-mover stock clearances."}
-                </p>
-              </div>
-
-              {/* Trending Cosmetics Insight */}
-              <div className="bg-royal-50/20 border border-royal-100/50 p-4 rounded-xl space-y-2">
-                <span className="text-[9px] font-extrabold text-royal-800 uppercase tracking-widest block font-sans">3. Shading & Variants Velocity</span>
-                <p className="text-xs text-zinc-700 font-sans leading-relaxed">
-                  {aiReport.trendingBeautySuggestions || "Maybelline Foundation shade 220 Natural Beige is our highest velocity variant; prepare early sub-stock procurement orders."}
-                </p>
-              </div>
-
-            </div>
-
-            {/* SUPPLIER PURCHASE ORDER AUTOMATED PROMPT */}
-            {aiReport.draftedSupplierEmail && (
-              <div className="border border-zinc-200 bg-zinc-50 rounded-xl p-4 space-y-2.5">
-                <div className="flex justify-between items-center pb-2 border-b border-zinc-200 border-dashed">
-                  <span className="text-[10px] font-bold text-zinc-900 uppercase tracking-widest flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-royal-700" />
-                    Supplier Procurement Order Email Draft
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(aiReport.draftedSupplierEmail)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-300 rounded transition cursor-pointer shadow-2xs"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-500" />
-                        Copied draft order!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3 text-gold-600" />
-                        Copy Restock Email
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <textarea
-                  readOnly
-                  value={aiReport.draftedSupplierEmail}
-                  rows={6}
-                  className="w-full bg-white text-zinc-800 p-3 rounded border border-zinc-200 focus:outline-hidden font-mono text-[11px] leading-relaxed resize-none cursor-text"
-                />
-                
-                <p className="text-[10px] text-zinc-400 font-sans">
-                  *This replenishment order automatically factors item safeLevels, live customer trends, and empty store stock to draft the exact purchase invoice list instantly.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Interactive Alert Actions Board */}

@@ -22,17 +22,19 @@ import {
   ShieldCheck,
   Coins
 } from 'lucide-react';
-import { Product, Sale, SaleItem } from '../types';
+import { Product, Sale, SaleItem, Customer } from '../types';
 import { formatUGX } from '../utils';
 
 interface PosRegisterProps {
   products: Product[];
+  customers?: Customer[];
   onRecordSale: (sale: Sale) => void;
   existingSalesCount: number;
 }
 
 export default function PosRegister({
   products,
+  customers = [],
   onRecordSale,
   existingSalesCount
 }: PosRegisterProps) {
@@ -586,9 +588,32 @@ export default function PosRegister({
 
         {/* Customer Information detail inputs */}
         <div className="p-4 border-t border-rose-100 bg-gray-50/50 space-y-3 shrink-0 text-gray-700">
+          <div>
+            <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Registered Customer (Optional Selection)</label>
+            <select 
+              value={customers.find(c => c.name === customerName)?.id || ''}
+              onChange={(e) => {
+                const selected = customers.find(c => c.id === e.target.id || c.id === e.target.value);
+                if (selected) {
+                  setCustomerName(selected.name);
+                  setCustomerPhone(selected.phone || '');
+                } else {
+                  setCustomerName('');
+                  setCustomerPhone('');
+                }
+              }}
+              className="w-full px-2 py-1 bg-white text-xs border border-rose-150 rounded mb-2"
+            >
+              <option value="">-- Direct Sale / Walk-in --</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Customer Name</label>
+              <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Manual Name Input</label>
               <div className="relative">
                 <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                 <input 

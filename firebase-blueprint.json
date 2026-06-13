@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["Owner / Manager", "Sales Cashier", "Store Accountant"] },
+        "email": { "type": "string" }
+      },
+      "required": ["userId", "fullName", "role", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Cosmetic product in stock",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "sku": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "safeLevel": { "type": "number" },
+        "expiryDate": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "category", "sku", "costPrice", "sellingPrice", "quantity", "safeLevel", "expiryDate"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer details and ledger info",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Sales transaction record",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "discount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "balanceDue": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["invoiceNumber", "items", "totalAmount", "paidAmount", "date"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Operating expense",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["date", "category", "amount"]
+    },
+    "CustomUser": {
+      "title": "Custom User",
+      "description": "User for custom auth system",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "password"]
+    }
+  },
+  "firestore": {
+    "/custom_users/{email}": {
+      "schema": "CustomUser",
+      "description": "Custom authentication users"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Inventory"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer database"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Sales history"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Expense records"
+    }
+  }
+}

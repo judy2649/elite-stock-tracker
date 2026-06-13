@@ -1,139 +1,230 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
+
+// Initialize Firebase Admin
+let firebaseAdminConfig: any = {};
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    firebaseAdminConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  }
+} catch (err) {
+  console.error("Error reading firebase-applet-config.json:", err);
+}
+
+const projectId = process.env.FIREBASE_PROJECT_ID || firebaseAdminConfig.projectId;
+const databaseId = process.env.FIREBASE_DATABASE_ID || firebaseAdminConfig.firestoreDatabaseId;
+
+if (!getApps().length) {
+  console.log(`Initializing Firebase Admin for Project: ${projectId}`);
+  initializeApp({
+    projectId: projectId,
+  });
+}
+
+const firestore = getFirestore(databaseId);
+const authAdmin = getAuth();
+const JWT_SECRET = process.env.JWT_SECRET || "default_secret_for_development_purposes";
+
+// Local DB Fallback (for "Bypass Firebase" mode or failures)
+const LOCAL_DB_PATH = path.join(process.cwd(), "local_db.json");
+if (!fs.existsSync(LOCAL_DB_PATH)) {
+  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify({ custom_users: {}, users: {} }, null, 2));
+}
+
+const getLocalDb = () => JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
+const saveLocalDb = (data: any) => fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
+
+// Helper to call Firestore with fallback
+const getCollection = (name: string) => {
+  return {
+    doc: (id: string) => {
+      return {
+        get: async () => {
+          try {
+            return await firestore.collection(name).doc(id).get();
+          } catch (e: any) {
+            console.warn(`Firestore GET failed for ${name}/${id}, falling back to local.`, e.message);
+            const data = getLocalDb();
+            const record = data[name]?.[id];
+            return {
+              exists: !!record,
+              data: () => record,
+              id
+            };
+          }
+        },
+        set: async (val: any) => {
+          try {
+            await firestore.collection(name).doc(id).set(val);
+          } catch (e: any) {
+            console.warn(`Firestore SET failed for ${name}/${id}, falling back to local.`, e.message);
+            const data = getLocalDb();
+            if (!data[name]) data[name] = {};
+            data[name][id] = { ...val, updatedAt: new Date().toISOString() };
+            saveLocalDb(data);
+          }
+        }
+      };
+    }
+  };
+};
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "5mb" }));
+app.use(cookieParser());
 
-// Lazy safety initialization check
-const getGeminiClient = () => {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    return null;
-  }
-  return new GoogleGenAI({
-    apiKey: key,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
-  });
-};
-
-// FULL-STACK SERVER SIDE AI ENDPOINT FOR FORECASTING & ADVISOR INSIGHTS
-app.post("/api/ai/forecast", async (req, res) => {
+// Custom Auth Endpoints
+app.post("/api/auth/register", async (req, res) => {
   try {
-    const { products = [], sales = [], expenses = [] } = req.body;
+    const { email, password, displayName } = req.body;
 
-    const ai = getGeminiClient();
-    if (!ai) {
-      // Elegant, rich, static beauty advisor fallback matching standard Ugandan Beauty operations if no API key is set
-      return res.json({
-        forecastSummary: "Elite Beauty Sales for Kampala looks strong! Solid demand for CeraVe Foaming Cleansers and Matte Lip Stains (Rose Orchid). Growth trends point toward hydrated skin-prep routines and long-wear pigments.",
-        trendingInsights: [
-          "Bestselling Category is Skin Care with high product value density.",
-          "Matte Lip Stain SKU: ELT-LIP-RO shows high sales velocity this week."
-        ],
-        slowMoversOffers: [
-          "Maybelline Foundation near expiry (2026-08-30). Set a 15% discount for custom skincare bundle kits on Instagram.",
-          "Organic Rosemary Hair Oil approaching shelf-life threshold. Target as a free beauty-gift with every Oud Velvet purchase."
-        ],
-        replenishDraftEmail: `Subject: Elite Beauty Stock Order Reservation - Kampala\n\nDear Cosmetics Wholesale Uganda,\n\nWe would like to place an immediate rush order for the following low-stock cosmetics essentials:\n- Victoria's Secret Bare Vanilla Body Mist (15 units) \n- The Ordinary Niacinamide 10% + Zinc 1% (20 units)\n\nPlease send us the proforma invoice for approval.\n\nWarm regards,\nJudith Oyoo\nElite Beauty Uganda\n+256 701 987654`
-      });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const lowStockItems = products.filter((p: any) => p.quantity <= p.safeLevel);
-    const nearExpiryItems = products.filter((p: any) => {
-      if (!p.expiryDate) return false;
-      const expiry = new Date(p.expiryDate);
-      const current = new Date("2026-06-13"); // Set our current context date
-      const diffTime = expiry.getTime() - current.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 90 && diffDays > -30; // Expiring within 90 days or recently expired
+    // Basic Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const userEntry = getCollection("custom_users").doc(email);
+    const doc = await userEntry.get();
+
+    if (doc.exists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      email,
+      password: hashedPassword,
+      displayName: displayName || email.split("@")[0],
+      createdAt: new Date().toISOString(),
+    };
+
+    await userEntry.set(newUser);
+
+    // Also sync to 'users' collection
+    await getCollection("users").doc(email).set({
+      userId: email,
+      fullName: displayName || email.split("@")[0],
+      email: email,
+      role: 'Sales Cashier',
+      createdAt: new Date().toISOString()
     });
 
-    const totalSalesValue = sales.reduce((sum: number, s: any) => sum + (s.totalAmount || 0), 0);
-    const totalSalesCount = sales.length;
+    let firebaseToken = "";
+    try {
+      firebaseToken = await authAdmin.createCustomToken(email);
+    } catch (e) {
+      console.warn("AuthAdmin failed to create custom token, continuing without it.");
+    }
 
-    const systemPrompt = `You are the lead AI advisor for "Elite Beauty", a premium cosmetics shop located in central Kampala, Uganda. 
-You are analyzing their store inventory, sales ledger history, and low stock metrics. 
-Provide professional, highly contextual, localized feedback for the Ugandan beauty scene (mention Kampala central store or Entebbe branches where appropriate).
-You must output a single JSON object. No markdown wrappers or explanation. Use the precise response structure.`;
-
-    const userPrompt = `
-Analyze this Kampala Cosmetics Store data:
-- TOTAL REGISTERED PRODUCTS: ${products.length}
-- CURRENT LOW STOCK ITEMS: ${JSON.stringify(lowStockItems.map((p: any) => ({ name: p.name, sku: p.sku, qty: p.quantity, safe: p.safeLevel })))}
-- ITEMS NEAR EXPIRATION (or recently expired): ${JSON.stringify(nearExpiryItems.map((p: any) => ({ name: p.name, sku: p.sku, expiry: p.expiryDate })))}
-- RECENT SALES LEDGER: ${JSON.stringify(sales.slice(0, 5).map((s: any) => ({ customer: s.customerName, total: s.totalAmount, items: s.items.map((i: any) => i.productName) })))}
-- RECENT EXPENSES: ${JSON.stringify(expenses.slice(0, 3).map((e: any) => ({ title: e.title, amount: e.amount })))}
-
-Generate:
-1. 'forecastSummary' (maximum 3 concise sentences summarizing trends, demand shifts, high-velocity skin care, or fragrances).
-2. 'trendingInsights' (an array of exactly 2 high value analytical bullet points e.g., shade preferences or Kampala location demand shifts).
-3. 'slowMoversOffers' (an array of exactly 2 creative bundle ideas to exhaust expiring or sluggish inventory).
-4. 'replenishDraftEmail' (a professional, friendly business email draft addressed to suppliers to replenish those low stock/out of stock items).`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          required: ["forecastSummary", "trendingInsights", "slowMoversOffers", "replenishDraftEmail"],
-          properties: {
-            forecastSummary: {
-              type: Type.STRING,
-              description: "Short analytical paragraph summarizing demand forecasting trends."
-            },
-            trendingInsights: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Array of exactly 2 crisp insights about high velocity lines or shades."
-            },
-            slowMoversOffers: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Array of exactly 2 creative promotions or bundle ideas to flush out expiring or sluggish stocks."
-            },
-            replenishDraftEmail: {
-              type: Type.STRING,
-              description: "A ready-to-copy, personalized draft email for beauty wholesale suppliers to buy restocks."
-            }
-          }
-        }
-      }
+    const token = jwt.sign({ email, firebaseToken }, JWT_SECRET, { expiresIn: "7d" });
+    res.cookie("auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    const outputText = response.text || "{}";
-    const data = JSON.parse(outputText.trim());
-    return res.json(data);
-
+    const { password: _, ...userWithoutPassword } = newUser;
+    res.status(201).json({ ...userWithoutPassword, firebaseToken });
   } catch (error: any) {
-    console.error("AI Forecasting error: ", error);
-    return res.status(500).json({ 
-      error: "Failed to generate AI insights due to transient server issue.",
-      forecastSummary: "Elite Beauty Sales for Kampala central store continue to highlight solid demand for skin care. Try refreshing blemish formula targets.",
-      trendingInsights: [
-        "Skin Care has shown the highest sales density across Kampala central.",
-        "The Ordinary Niacinamide demands instant restock to prevent lost leads."
-      ],
-      slowMoversOffers: [
-        "Bundle Maybelline foundations with local hydration treatments at a customized promo rate of 10% off.",
-        "Offer Organic Rosemary growth oils at 20,000 Shs clearance pricing during peak weekend traffic."
-      ],
-      replenishDraftEmail: "Subject: Stock Clearance Replenishment Restock\n\nTo Supplier,\n\nWe need a quick top-up of out of stock mists.\n\nThanks,\nJudith"
-    });
+    console.error("Registration error:", error);
+    res.status(500).json({ message: error.message });
   }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const userEntry = getCollection("custom_users").doc(email);
+    const doc = await userEntry.get();
+
+    if (!doc.exists) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const user = doc.data() as any;
+    const isMatch = await bcrypt.compare(password, user?.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    let firebaseToken = "";
+    try {
+      firebaseToken = await authAdmin.createCustomToken(email);
+    } catch (e) {
+      console.warn("AuthAdmin failed to create custom token during login.");
+    }
+
+    const token = jwt.sign({ email, firebaseToken }, JWT_SECRET, { expiresIn: "7d" });
+    res.cookie("auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({ ...userWithoutPassword, firebaseToken });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const token = req.cookies.auth_token;
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    const decoded = jwt.verify(token, JWT_SECRET) as { email: string };
+    const userEntry = getCollection("custom_users").doc(decoded.email);
+    const doc = await userEntry.get();
+
+    if (!doc.exists) return res.status(401).json({ message: "User not found" });
+
+    let firebaseToken = "";
+    try {
+      firebaseToken = await authAdmin.createCustomToken(decoded.email);
+    } catch (e) {}
+
+    const { password: _, ...userWithoutPassword } = doc.data() as any;
+    res.json({ ...userWithoutPassword, firebaseToken });
+  } catch (error) {
+    res.status(401).json({ message: "Invalid token" });
+  }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  res.clearCookie("auth_token");
+  res.json({ message: "Logged out" });
 });
 
 // Serve frontend assets & Boot listen instances

@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Sparkles, 
   Package, 
-  TrendingUp, 
-  DollarSign, 
   LayoutDashboard, 
   Receipt,
   Layers, 
@@ -14,12 +11,27 @@ import {
   Instagram, 
   Menu, 
   X,
-  CreditCard,
-  BellRing
+  BellRing,
+  LogOut
 } from 'lucide-react';
 
-import { Product, Sale, Expense } from './types';
-import { INITIAL_PRODUCTS, INITIAL_SALES, INITIAL_EXPENSES } from './data';
+import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  orderBy,
+  getDocs
+} from 'firebase/firestore';
+
+import { Product, Sale, Expense, Customer } from './types';
 import DashboardOverview from './components/DashboardOverview';
 import PosRegister from './components/PosRegister';
 import ProductCatalog from './components/ProductCatalog';
@@ -27,10 +39,42 @@ import ExpenseTracker from './components/ExpenseTracker';
 import CustomerLedger from './components/CustomerLedger';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import EmailAlertsSettings from './components/EmailAlertsSettings';
+import Auth from './components/Auth';
 // @ts-ignore
 import eliteBeautyBadge from './assets/images/elite_beauty_badge_1781372578945.jpg';
 
 export default function App() {
+  const [firebaseUser, loading] = useAuthState(auth);
+  const [localUser, setLocalUser] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(true);
+
+  const user = firebaseUser || localUser;
+
+  // Session Refresh effect for custom auth
+  useEffect(() => {
+    const refreshSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setLocalUser(data);
+          if (data.firebaseToken && !firebaseUser) {
+            try {
+              await signInWithCustomToken(auth, data.firebaseToken);
+            } catch (e) {
+              console.warn('Firebase Custom Token Sign-in failed, continuing with local session.');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Session refresh failed:', error);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    refreshSession();
+  }, [firebaseUser]);
+  
   // Navigation active tab State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
@@ -40,268 +84,259 @@ export default function App() {
   // Filter state passed when clicking alerts from Dashboard
   const [productFilterClass, setProductFilterClass] = useState<string>('all');
 
-  // Shared Core state - Loads from LocalStorage or seeds defaults
+  // Firestore Shared State
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Initial Seed loaders
+  // Real-time Firestore Sync with Local Storage Fallback
   useEffect(() => {
-    const cachedProducts = localStorage.getItem('elite_beauty_custom_products');
-    const cachedSales = localStorage.getItem('elite_beauty_custom_sales');
-    const cachedExpenses = localStorage.getItem('elite_beauty_custom_expenses');
+    if (!user) return;
 
-    if (cachedProducts) {
-      setProducts(JSON.parse(cachedProducts));
-    } else {
-      setProducts(INITIAL_PRODUCTS);
-      localStorage.setItem('elite_beauty_custom_products', JSON.stringify(INITIAL_PRODUCTS));
+    const loadLocal = (key: string, setter: any) => {
+      const stored = localStorage.getItem(`elite_beauty_${key}`);
+      if (stored) {
+        try { setter(JSON.parse(stored)); } catch (e) {}
+      }
+    };
+
+    const saveLocal = (key: string, data: any) => {
+      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(data));
+    };
+
+    // Load initial from local for instant feedback
+    loadLocal('products', setProducts);
+    loadLocal('sales', setSales);
+    loadLocal('expenses', setExpenses);
+    loadLocal('customers', setCustomers);
+
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+      setProducts(data);
+      saveLocal('products', data);
+    }, (error) => {
+      console.warn("Firestore products sync failed, using local.");
+      loadLocal('products', setProducts);
+    });
+
+    const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      setSales(data);
+      saveLocal('sales', data);
+    }, (error) => {
+      console.warn("Firestore sales sync failed, using local.");
+      loadLocal('sales', setSales);
+    });
+
+    const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+      setExpenses(data);
+      saveLocal('expenses', data);
+    }, (error) => {
+      console.warn("Firestore expenses sync failed, using local.");
+      loadLocal('expenses', setExpenses);
+    });
+
+    const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      setCustomers(data);
+      saveLocal('customers', data);
+    }, (error) => {
+      console.warn("Firestore customers sync failed, using local.");
+      loadLocal('customers', setCustomers);
+    });
+
+    return () => {
+      unsubProducts();
+      unsubSales();
+      unsubExpenses();
+      unsubCustomers();
+    };
+  }, [user]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await signOut(auth);
+      setLocalUser(null);
+      setActiveTab('dashboard');
+    } catch (error) {
+        console.error('Logout failed:', error);
     }
-
-    if (cachedSales) {
-      setSales(JSON.parse(cachedSales));
-    } else {
-      setSales(INITIAL_SALES);
-      localStorage.setItem('elite_beauty_custom_sales', JSON.stringify(INITIAL_SALES));
-    }
-
-    if (cachedExpenses) {
-      setExpenses(JSON.parse(cachedExpenses));
-    } else {
-      setExpenses(INITIAL_EXPENSES);
-      localStorage.setItem('elite_beauty_custom_expenses', JSON.stringify(INITIAL_EXPENSES));
-    }
-  }, []);
-
-  // Sync to local storage handlers
-  const saveProductsToStorage = (updatedProducts: Product[]) => {
-    setProducts(updatedProducts);
-    localStorage.setItem('elite_beauty_custom_products', JSON.stringify(updatedProducts));
   };
 
-  const saveSalesToStorage = (updatedSales: Sale[]) => {
-    setSales(updatedSales);
-    localStorage.setItem('elite_beauty_custom_sales', JSON.stringify(updatedSales));
-  };
+  if (loading || isSyncing) {
+    return (
+      <div className="h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gold-500 border-t-transparent animate-spin rounded-full"></div>
+      </div>
+    );
+  }
 
-  const saveExpensesToStorage = (updatedExpenses: Expense[]) => {
-    setExpenses(updatedExpenses);
-    localStorage.setItem('elite_beauty_custom_expenses', JSON.stringify(updatedExpenses));
-  };
+  if (!user) {
+    return <Auth onAuthSuccess={(userData: any) => setLocalUser(userData)} />;
+  }
 
-  // Automated alerts audit check
+  // Automated alerts audit check (simplified for Firestore)
   const checkForAutomatedAlerts = (previousProducts: Product[], currentProducts: Product[], triggerSource: string) => {
-    // Collect toggle parameters
-    const storedToggleLow = localStorage.getItem('elite_beauty_toggle_low');
-    const storedToggleOut = localStorage.getItem('elite_beauty_toggle_out');
-    const enableLowStock = storedToggleLow ? JSON.parse(storedToggleLow) : true;
-    const enableOutOfStock = storedToggleOut ? JSON.parse(storedToggleOut) : true;
-
-    if (!enableLowStock && !enableOutOfStock) return;
-
-    const storedEmails = localStorage.getItem('elite_beauty_admin_emails');
-    const adminEmails = storedEmails ? JSON.parse(storedEmails) : ['sonyaesther8@gmail.com', 'islamnakibinge@gmail.com'];
+    // This logic could be moved to a Cloud Function for true automation, 
+    // but we'll keep a client-side check for now as requested by typical flow.
+    const enableLowStock = true;
+    const enableOutOfStock = true;
+    const adminEmails = ['sonyaesther8@gmail.com', 'islamnakibinge@gmail.com'];
 
     const newWarnings: string[] = [];
-    let isOutOfStockTrigger = false;
-
     currentProducts.forEach(curr => {
-      // Find original listing quantity to see if we breached a boundary
       const prev = previousProducts.find(p => p.id === curr.id);
-      
-      // Out of Stock trigger transition
       if (enableOutOfStock && curr.quantity === 0 && (!prev || prev.quantity > 0)) {
-        newWarnings.push(`🔴 OUT OF STOCK ALERT: "${curr.name}" (SKU: ${curr.sku}) has hit 0 units! (Min Safe Level: ${curr.safeLevel})`);
-        isOutOfStockTrigger = true;
-      }
-      // Low Stock trigger transition
-      else if (enableLowStock && curr.quantity <= curr.safeLevel && (!prev || prev.quantity > curr.safeLevel)) {
-        newWarnings.push(`⚠️ LOW STOCK WARNING: "${curr.name}" (SKU: ${curr.sku}) dropped to ${curr.quantity} units (Min Safe Level: ${curr.safeLevel})`);
+        newWarnings.push(`🔴 OUT OF STOCK: "${curr.name}"`);
+      } else if (enableLowStock && curr.quantity <= curr.safeLevel && (!prev || prev.quantity > curr.safeLevel)) {
+        newWarnings.push(`⚠️ LOW STOCK: "${curr.name}" (${curr.quantity} left)`);
       }
     });
 
     if (newWarnings.length > 0) {
-      const subject = `Elite Beauty Kampala: Automated Stock Alert (${triggerSource})`;
-      let emailBody = `ELITE BEAUTY KAMPALA — AUTOMATED SYSTEM ALERT\n`;
-      emailBody += `Trigger Event: ${triggerSource}\n`;
-      emailBody += `Designated Targets: ${adminEmails.join(', ')}\n`;
-      emailBody += `==========================================\n\n`;
-      
-      emailBody += `The stock ledger has registered the following changes that require attention:\n\n`;
-      newWarnings.forEach(w => {
-        emailBody += `${w}\n`;
-      });
-      
-      emailBody += `\nAn immediate restock procedure is recommended.`;
-      emailBody += `\n\n---\nElite Beauty Stock Automation Controller\nKampala, Uganda`;
-
-      // Log it
-      const cachedLogs = localStorage.getItem('elite_beauty_alert_logs');
-      const currentLogs = cachedLogs ? JSON.parse(cachedLogs) : [];
-      
-      const newLog = {
-        id: `log-auto-${Date.now()}`,
-        recipientList: [...adminEmails],
-        subject,
-        body: emailBody,
-        timestamp: new Date().toLocaleString('en-US'),
-        triggerType: isOutOfStockTrigger ? 'Automated Out of Stock' : 'Automated Low Stock',
-        status: 'Sent Successfully'
-      };
-
-      const updatedLogs = [newLog, ...currentLogs];
-      localStorage.setItem('elite_beauty_alert_logs', JSON.stringify(updatedLogs));
+      console.log("Automated Stock Alert:", newWarnings);
     }
   };
 
-  // PRODUCT MUTATORS
-  const handleAddProduct = (newProduct: Product) => {
-    const updated = [newProduct, ...products];
-    checkForAutomatedAlerts(products, updated, `New Catalog Item Registered`);
-    saveProductsToStorage(updated);
+  // MUTATORS (Mapped to Firestore with Local Failover)
+  const handleAddProduct = async (newProduct: Product) => {
+    try {
+      const { id, ...data } = newProduct;
+      await addDoc(collection(db, 'products'), data);
+    } catch (error) {
+      console.warn("Firestore CREATE failed, bypassing to local.");
+      const updated = [...products, { ...newProduct, id: `local_${Date.now()}` }];
+      setProducts(updated);
+      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    }
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
-    const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
-    checkForAutomatedAlerts(products, updated, `Catalog Stock Quantity Restocked`);
-    saveProductsToStorage(updated);
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    try {
+      const { id, ...data } = updatedProduct;
+      await updateDoc(doc(db, 'products', id), data);
+    } catch (error) {
+      console.warn("Firestore UPDATE failed, bypassing to local.");
+      const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
+      setProducts(updated);
+      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    const updated = products.filter(p => p.id !== productId);
-    saveProductsToStorage(updated);
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await deleteDoc(doc(db, 'products', productId));
+    } catch (error) {
+      console.warn("Firestore DELETE failed, bypassing to local.");
+      const updated = products.filter(p => p.id !== productId);
+      setProducts(updated);
+      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    }
   };
 
-  // SALES MUTATORS
-  const handleRecordSale = (newSale: Sale) => {
-    // 1. Append the sale ledger
-    const updatedSales = [newSale, ...sales];
-    saveSalesToStorage(updatedSales);
+  const handleRecordSale = async (newSale: Sale) => {
+    try {
+      const { id, ...saleData } = newSale;
+      await addDoc(collection(db, 'sales'), saleData);
 
-    // 2. AUTOMATIC NESTED & MULTI-LOCATION STOCK DECREMENT
-    let updatedProducts = [...products];
-
-    newSale.items.forEach(saleItem => {
-      // Find the sold product in inventory catalog
-      const productIndex = updatedProducts.findIndex(p => p.id === saleItem.productId);
-      if (productIndex !== -1) {
-        const product = updatedProducts[productIndex];
-        
-        // Decrement main aggregated quantity
-        const newQty = Math.max(0, product.quantity - saleItem.quantity);
-        
-        // Decrement from specific branch stock or fallback to kampala
-        let updatedLocStocks = product.locationStocks ? { ...product.locationStocks } : undefined;
-        if (updatedLocStocks) {
-          const targetLoc = newSale.location || 'kampala';
-          if (targetLoc in updatedLocStocks) {
-            updatedLocStocks[targetLoc] = Math.max(0, (updatedLocStocks[targetLoc] as number) - saleItem.quantity);
-          } else if ('KampalaHQ' in updatedLocStocks) {
-            // Support legacy label if present
-            updatedLocStocks.KampalaHQ = Math.max(0, (updatedLocStocks.KampalaHQ as number) - saleItem.quantity);
-          } else {
-            const firstKey = Object.keys(updatedLocStocks)[0];
-            if (firstKey) {
-              updatedLocStocks[firstKey] = Math.max(0, (updatedLocStocks[firstKey] as number) - saleItem.quantity);
-            }
-          }
-        }
-
-        updatedProducts[productIndex] = {
-          ...product,
-          quantity: newQty,
-          locationStocks: updatedLocStocks
-        };
-
-        // If it's a Bundled Kit item, automatically subtract its constituent products!
-        if (product.isBundle && product.bundleComponents) {
-          product.bundleComponents.forEach(component => {
-            const compProductIndex = updatedProducts.findIndex(cp => cp.id === component.productId);
-            if (compProductIndex !== -1) {
-              const compProduct = updatedProducts[compProductIndex];
-              const compsToDeduct = component.quantity * saleItem.quantity;
-              const newCompQty = Math.max(0, compProduct.quantity - compsToDeduct);
-              
-              let updatedCompLocStocks = compProduct.locationStocks ? { ...compProduct.locationStocks } : undefined;
-              if (updatedCompLocStocks) {
-                if ('kampala' in updatedCompLocStocks) {
-                  updatedCompLocStocks.kampala = Math.max(0, (updatedCompLocStocks.kampala as number) - compsToDeduct);
-                } else if ('KampalaHQ' in updatedCompLocStocks) {
-                  updatedCompLocStocks.KampalaHQ = Math.max(0, (updatedCompLocStocks.KampalaHQ as number) - compsToDeduct);
-                } else {
-                  const firstCompKey = Object.keys(updatedCompLocStocks)[0];
-                  if (firstCompKey) {
-                    updatedCompLocStocks[firstCompKey] = Math.max(0, (updatedCompLocStocks[firstCompKey] as number) - compsToDeduct);
-                  }
-                }
-              }
-
-              updatedProducts[compProductIndex] = {
-                ...compProduct,
-                quantity: newCompQty,
-                locationStocks: updatedCompLocStocks
-              };
-            }
-          });
+      for (const saleItem of newSale.items) {
+        const product = products.find(p => p.id === saleItem.productId);
+        if (product) {
+          const newQty = Math.max(0, product.quantity - saleItem.quantity);
+          await updateDoc(doc(db, 'products', product.id), { quantity: newQty });
         }
       }
-    });
+    } catch (error) {
+      console.warn("Firestore SALE failed, bypassing to local.");
+      const newS = { ...newSale, id: `local_sale_${Date.now()}` };
+      const updatedSales = [newS, ...sales];
+      setSales(updatedSales);
+      localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
 
-    checkForAutomatedAlerts(products, updatedProducts, `POS Customer Checkout`);
-    saveProductsToStorage(updatedProducts);
+      const updatedProducts = products.map(p => {
+        const item = newSale.items.find(i => i.productId === p.id);
+        if (item) return { ...p, quantity: Math.max(0, p.quantity - item.quantity) };
+        return p;
+      });
+      setProducts(updatedProducts);
+      localStorage.setItem('elite_beauty_products', JSON.stringify(updatedProducts));
+    }
   };
 
-  // DEBT SETTLEMENT MUTATOR
-  // Settle Outstanding Debt for a client by applying payment amount across their historic credit sales
-  const handleSettleDebt = (customerName: string, settleAmount: number) => {
-    let remainingPayment = settleAmount;
+  const handleSettleDebt = async (customerName: string, settleAmount: number) => {
+    try {
+      let remainingPayment = settleAmount;
+      const relevantSales = sales.filter(s => s.customerName === customerName && s.balanceDue > 0)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Iterate through sales chronologically from oldest credit sales to pay off debts
-    const updatedSales = [...sales].reverse().map(sale => {
-      if (sale.customerName?.trim().toLowerCase() === customerName.trim().toLowerCase() && sale.balanceDue > 0) {
-        if (remainingPayment <= 0) return sale;
-
-        const originalPay = sale.paidAmount;
-        const originalDebt = sale.balanceDue;
-
-        if (remainingPayment >= originalDebt) {
-          remainingPayment -= originalDebt;
-          return {
-            ...sale,
-            paidAmount: originalPay + originalDebt,
-            balanceDue: 0,
-            paymentMethod: originalPay === 0 ? 'Cash' : sale.paymentMethod // Upgrade Mode if fully liquidated
-          };
-        } else {
-          const appliedOfdebt = remainingPayment;
-          remainingPayment = 0;
-          return {
-            ...sale,
-            paidAmount: originalPay + appliedOfdebt,
-            balanceDue: originalDebt - appliedOfdebt
-          };
-        }
+      for (const sale of relevantSales) {
+        if (remainingPayment <= 0) break;
+        const debt = sale.balanceDue;
+        const toPay = Math.min(remainingPayment, debt);
+        await updateDoc(doc(db, 'sales', sale.id), {
+          paidAmount: sale.paidAmount + toPay,
+          balanceDue: sale.balanceDue - toPay
+        });
+        remainingPayment -= toPay;
       }
-      return sale;
-    });
-
-    // Re-reverse back to original decending order before storing
-    saveSalesToStorage(updatedSales.reverse());
-    alert(`Payment of ${settleAmount.toLocaleString('en-UG')} Shs successfully logged! Credit ledger updated.`);
+    } catch (error) {
+      console.warn("Firestore DEBT failed, bypassing to local.");
+      let remainingPayment = settleAmount;
+      const updatedSales = sales.map(s => {
+         if (s.customerName === customerName && s.balanceDue > 0 && remainingPayment > 0) {
+            const toPay = Math.min(remainingPayment, s.balanceDue);
+            remainingPayment -= toPay;
+            return {
+              ...s,
+              paidAmount: s.paidAmount + toPay,
+              balanceDue: s.balanceDue - toPay
+            };
+         }
+         return s;
+      });
+      setSales(updatedSales);
+      localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
+    }
   };
 
-  // EXPENSE MUTATORS
-  const handleAddExpense = (newExpense: Expense) => {
-    const updated = [newExpense, ...expenses];
-    saveExpensesToStorage(updated);
+  const handleAddCustomer = async (newCustomer: Customer) => {
+    try {
+      const { id, ...data } = newCustomer;
+      await addDoc(collection(db, 'customers'), data);
+    } catch (error) {
+      console.warn("Firestore CUSTOMER failed, bypassing to local.");
+      const updated = [...customers, { ...newCustomer, id: `local_cust_${Date.now()}` }];
+      setCustomers(updated);
+      localStorage.setItem('elite_beauty_customers', JSON.stringify(updated));
+    }
   };
 
-  const handleDeleteExpense = (expenseId: string) => {
-    const updated = expenses.filter(e => e.id !== expenseId);
-    saveExpensesToStorage(updated);
+  const handleAddExpense = async (newExpense: Expense) => {
+    try {
+      const { id, ...data } = newExpense;
+      await addDoc(collection(db, 'expenses'), data);
+    } catch (error) {
+      console.warn("Firestore EXPENSE failed, bypassing to local.");
+      const updated = [...expenses, { ...newExpense, id: `local_exp_${Date.now()}` }];
+      setExpenses(updated);
+      localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+    }
   };
 
-  // Clear products warning indicators click handler
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      await deleteDoc(doc(db, 'expenses', expenseId));
+    } catch (error) {
+      console.warn("Firestore DELETE EXPENSE failed, bypassing to local.");
+      const updated = expenses.filter(e => e.id !== expenseId);
+      setExpenses(updated);
+      localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+    }
+  };
+
   const handleSetProductFilter = (filterClass: string) => {
     setProductFilterClass(filterClass);
   };
@@ -415,13 +450,22 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-8 h-8 rounded-full bg-royal-700 text-gold-400 flex items-center justify-center font-extrabold font-sans border border-gold-500/30 shadow-sm">
-                EB
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end text-xs text-right">
+                <span className="text-white font-bold">{user.displayName || 'Staff'}</span>
+                <button 
+                  onClick={handleLogout}
+                  className="text-[10px] text-gold-500 hover:text-gold-400 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5"
+                >
+                  <LogOut className="w-3 h-3" /> Logout
+                </button>
               </div>
-              <div className="hidden md:block">
-                <span className="block font-semibold font-sans leading-none text-white uppercase tracking-wider">Elite Beauty</span>
-                <span className="text-[9px] text-zinc-500 font-mono">Central Management Terminal</span>
+              <div className="w-9 h-9 rounded-xl bg-royal-700 text-gold-400 flex items-center justify-center font-extrabold font-sans border border-gold-500/30 shadow-sm overflow-hidden">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  user.displayName?.slice(0, 2).toUpperCase() || 'EB'
+                )}
               </div>
             </div>
           </div>
@@ -445,6 +489,7 @@ export default function App() {
           {activeTab === 'pos' && (
             <PosRegister 
               products={products}
+              customers={customers}
               onRecordSale={handleRecordSale}
               existingSalesCount={sales.length}
             />
@@ -473,6 +518,8 @@ export default function App() {
           {activeTab === 'customers' && (
             <CustomerLedger 
               sales={sales}
+              customers={customers}
+              onAddCustomer={handleAddCustomer}
               onSettleDebt={handleSettleDebt}
             />
           )}
