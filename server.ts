@@ -53,9 +53,10 @@ const getCollection = (name: string) => {
       return {
         get: async () => {
           try {
-            return await firestore.collection(name).doc(id).get();
+            const res = await firestore.collection(name).doc(id).get();
+            return res;
           } catch (e: any) {
-            console.warn(`Firestore GET failed for ${name}/${id}, falling back to local.`, e.message);
+            console.error(`[AUTH DIAGNOSTIC] Firestore GET failed for ${name}/${id}:`, e.message);
             const data = getLocalDb();
             const record = data[name]?.[id];
             return {
@@ -69,7 +70,7 @@ const getCollection = (name: string) => {
           try {
             await firestore.collection(name).doc(id).set(val);
           } catch (e: any) {
-            console.warn(`Firestore SET failed for ${name}/${id}, falling back to local.`, e.message);
+            console.error(`[AUTH DIAGNOSTIC] Firestore SET failed for ${name}/${id}:`, e.message);
             const data = getLocalDb();
             if (!data[name]) data[name] = {};
             data[name][id] = { ...val, updatedAt: new Date().toISOString() };
@@ -90,7 +91,8 @@ app.use(cookieParser());
 // Custom Auth Endpoints
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email: rawEmail, password, displayName } = req.body;
+    const email = rawEmail?.toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -145,6 +147,7 @@ app.post("/api/auth/register", async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
     });
 
     const { password: _, ...userWithoutPassword } = newUser;
@@ -157,7 +160,8 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = rawEmail?.toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -171,7 +175,11 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const user = doc.data() as any;
-    const isMatch = await bcrypt.compare(password, user?.password);
+    if (!user?.password) {
+      return res.status(401).json({ message: "Account configuration error. Please contact support." });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -190,11 +198,13 @@ app.post("/api/auth/login", async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
     });
 
     const { password: _, ...userWithoutPassword } = user;
     res.json({ ...userWithoutPassword, firebaseToken });
   } catch (error: any) {
+    console.error("Login Error:", error);
     res.status(500).json({ message: error.message });
   }
 });

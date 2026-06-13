@@ -21,10 +21,13 @@ service cloud.firestore {
 
     // --- User Profiles ---
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if false; // Users can't list each other
-      allow create, update: if isOwner(userId);
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn(); // Allow creation/syncing
       allow delete: if false;
+    }
+
+    match /custom_users/{userId} {
+      allow read, write: if false; // Only backend (Admin SDK) should touch this
     }
 
     // --- Products ---
