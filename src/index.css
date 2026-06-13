@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", serif;
+  --font-space: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Premium Gold Swatch */
+  --color-gold-50: #fbf8f1;
+  --color-gold-100: #f6eeda;
+  --color-gold-250: #eeddaf;
+  --color-gold-300: #e4c47b;
+  --color-gold-400: #d6a74b;
+  --color-gold-500: #c49a45;
+  --color-gold-600: #ab8032;
+  --color-gold-700: #8c6324;
+  --color-gold-850: #624217;
+  --color-gold-950: #291a07;
+
+  /* Royal / Cosmic Navy Blue Swatch */
+  --color-royal-50: #f0f4fc;
+  --color-royal-100: #dee7f9;
+  --color-royal-200: #c4d4f4;
+  --color-royal-400: #89a9eb;
+  --color-royal-650: #1d4ed8;
+  --color-royal-700: #1d40af;
+  --color-royal-800: #1e3a8a;
+  --color-royal-900: #0f245a;
+  --color-royal-950: #02091c;
+}
+
+/* Custom scrollbar styling for beautiful dashboards */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Custom fade element styles helper */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Glassmorphism elements for elegant modern cosmetics ui */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(251, 113, 133, 0.1);
+}
+

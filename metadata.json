@@ -1,0 +1,6 @@
+{
+  "name": "Elite Beauty Stock Tracker",
+  "description": "A customized luxury cosmetics boutique inventory management and responsive cash POS ledger tailored for Elite Beauty, Uganda.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
