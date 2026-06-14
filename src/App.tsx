@@ -54,7 +54,7 @@ export default function App() {
   useEffect(() => {
     if (!loading) {
       if (!firebaseUser) {
-        const stored = localStorage.getItem('local_mock_user');
+        const stored = localStorage.getItem('local_mock_session');
         if (stored) {
           try {
             setLocalUser(JSON.parse(stored));
@@ -159,7 +159,7 @@ export default function App() {
       if (typeof auth.signOut === 'function') {
         await signOut(auth);
       }
-      localStorage.removeItem('local_mock_user');
+      localStorage.removeItem('local_mock_session');
       setLocalUser(null);
       setActiveTab('dashboard');
     } catch (error) {

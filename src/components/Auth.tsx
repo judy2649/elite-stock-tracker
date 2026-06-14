@@ -36,7 +36,15 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
         // Local simulation for Google Login
         const mockEmail = "testuser@gmail.com";
         const mockName = "Google Test User";
-        localStorage.setItem('local_mock_user', JSON.stringify({ email: mockEmail, fullName: mockName }));
+        
+        const usersStored = localStorage.getItem('local_mock_users') || "{}";
+        const users = JSON.parse(usersStored);
+        if (!users[mockEmail]) {
+          users[mockEmail] = { email: mockEmail, password: '', fullName: mockName };
+          localStorage.setItem('local_mock_users', JSON.stringify(users));
+        }
+        
+        localStorage.setItem('local_mock_session', JSON.stringify({ email: mockEmail, displayName: mockName }));
         onAuthSuccess({ email: mockEmail, displayName: mockName });
         return;
       }
@@ -119,16 +127,25 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
 
       if (!isFirebaseAvailable) {
         // Local simulation for offline/dev preview without backend
+        const usersStored = localStorage.getItem('local_mock_users') || "{}";
+        const users = JSON.parse(usersStored);
+
         if (mode === 'register') {
-          localStorage.setItem('local_mock_user', JSON.stringify({ email, password, fullName }));
+          if (users[email]) {
+            throw new Error("User with this email already exists");
+          }
+          users[email] = { email, password, fullName };
+          localStorage.setItem('local_mock_users', JSON.stringify(users));
+          localStorage.setItem('local_mock_session', JSON.stringify({ email, displayName: fullName }));
+          onAuthSuccess({ email, displayName: fullName || email.split('@')[0] });
         } else {
-          const stored = localStorage.getItem('local_mock_user');
-          const user = stored ? JSON.parse(stored) : null;
-          if (!user || user.email !== email || user.password !== password) {
+          const user = users[email];
+          if (!user || user.password !== password) {
             throw new Error("Invalid email or password");
           }
+          localStorage.setItem('local_mock_session', JSON.stringify({ email, displayName: user.fullName }));
+          onAuthSuccess({ email, displayName: user.fullName || email.split('@')[0] });
         }
-        onAuthSuccess({ email, displayName: fullName || "Mock User" });
       } else {
         let user;
         if (mode === 'register') {
