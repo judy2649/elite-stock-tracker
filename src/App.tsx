@@ -17,7 +17,7 @@ import {
 
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { 
   collection, 
   onSnapshot, 
@@ -50,30 +50,20 @@ export default function App() {
 
   const user = firebaseUser || localUser;
 
-  // Session Refresh effect for custom auth
+  // Initialize Auth State (Fallback to Local Mock if Firebase absent)
   useEffect(() => {
-    const refreshSession = async () => {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          setLocalUser(data);
-          if (data.firebaseToken && !firebaseUser) {
-            try {
-              await signInWithCustomToken(auth, data.firebaseToken);
-            } catch (e) {
-              console.warn('Firebase Custom Token Sign-in failed, continuing with local session.');
-            }
-          }
+    if (!loading) {
+      if (!firebaseUser) {
+        const stored = localStorage.getItem('local_mock_user');
+        if (stored) {
+          try {
+            setLocalUser(JSON.parse(stored));
+          } catch (e) {}
         }
-      } catch (error) {
-        console.error('Session refresh failed:', error);
-      } finally {
-        setIsSyncing(false);
       }
-    };
-    refreshSession();
-  }, [firebaseUser]);
+      setIsSyncing(false);
+    }
+  }, [loading, firebaseUser]);
   
   // Navigation active tab State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -166,8 +156,10 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      await signOut(auth);
+      if (typeof auth.signOut === 'function') {
+        await signOut(auth);
+      }
+      localStorage.removeItem('local_mock_user');
       setLocalUser(null);
       setActiveTab('dashboard');
     } catch (error) {

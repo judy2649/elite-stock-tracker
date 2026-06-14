@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   signOut, 
-  signInWithCustomToken,
   signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import { auth, googleProvider, db } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -102,36 +103,56 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
     }
 
     try {
-      const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
-      const body = mode === 'register' 
-        ? { email, password, displayName: fullName }
-        : { email, password };
+      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      // If we have a firebase token, try to sign in, but don't BLOCK the UI if it fails
-      if (data.firebaseToken) {
-        try {
-          await signInWithCustomToken(auth, data.firebaseToken);
-        } catch (authError) {
-          console.warn("Firebase Auth Fail (ignoring as per bypass):", authError);
+      if (!isFirebaseAvailable) {
+        // Local simulation for offline/dev preview without backend
+        if (mode === 'register') {
+          localStorage.setItem('local_mock_user', JSON.stringify({ email, password, fullName }));
+        } else {
+          const stored = localStorage.getItem('local_mock_user');
+          const user = stored ? JSON.parse(stored) : null;
+          if (!user || user.email !== email || user.password !== password) {
+            throw new Error("Invalid email or password");
+          }
         }
-      }
+        onAuthSuccess({ email, displayName: fullName || "Mock User" });
+      } else {
+        let user;
+        if (mode === 'register') {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          user = userCredential.user;
+          
+          // Try to sync to firestore
+          try {
+            const userRef = doc(db, 'users', user.email!);
+            await setDoc(userRef, {
+              userId: user.email,
+              fullName: fullName || user.email?.split('@')[0],
+              email: user.email,
+              role: 'Sales Cashier',
+              createdAt: serverTimestamp()
+            });
+          } catch (e) {
+            console.warn("Firestore user sync failed, continuing", e);
+          }
+        } else {
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          user = userCredential.user;
+        }
 
-      // Call success anyway with the data from our backend
-      onAuthSuccess(data);
+        onAuthSuccess({
+          email: user.email,
+          displayName: user.displayName || fullName || user.email?.split('@')[0],
+          photoURL: user.photoURL
+        });
+      }
     } catch (error: any) {
-      setError(error.message);
+      if (error.code === 'auth/unauthorized-domain') {
+        setError("Domain not authorized in Firebase. Please add this URL to Firebase Console > Authentication > Settings > Authorized domains.");
+      } else {
+        setError(error.message || "Authentication failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -330,8 +351,9 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
 export function LogoutButton() {
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      await signOut(auth);
+      if (typeof auth.signOut === 'function') {
+        await signOut(auth);
+      }
     } catch (error) {
       console.error('Logout error:', error);
     }
