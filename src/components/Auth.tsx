@@ -103,7 +103,8 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
     }
 
     try {
-      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
+      // Force local mode for email auth to bypass Firebase
+      const isFirebaseAvailable = false; // Bypass Firebase completely for email auth
 
       if (!isFirebaseAvailable) {
         // Local simulation for offline/dev preview without backend
