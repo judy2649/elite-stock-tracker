@@ -21,6 +21,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
   const handleGoogleLogin = async () => {
@@ -90,6 +91,12 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
 
     if (mode === 'register' && !fullName.trim()) {
       setError("Please enter your full name.");
+      setLoading(false);
+      return;
+    }
+
+    if (mode === 'register' && password !== confirmPassword) {
+      setError("Passwords do not match.");
       setLoading(false);
       return;
     }
@@ -236,6 +243,32 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
               />
             </div>
           </div>
+
+          <AnimatePresence mode="wait">
+            {mode === 'register' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Confirm Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                    <input
+                      required={mode === 'register'}
+                      type="password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500/50 focus:outline-none transition-all placeholder:text-zinc-700"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {error && (
             <motion.p 
