@@ -15,7 +15,7 @@ import {
   LogOut
 } from 'lucide-react';
 
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, isFirebaseAvailable } from './lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import { 
@@ -53,7 +53,6 @@ export default function App() {
   // Auto-migrate local data to Firestore once connection is open
   useEffect(() => {
     if (!user) return;
-    const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
     if (!isFirebaseAvailable) return;
 
     const migrateLocals = async (key: string, collectionName: string) => {
@@ -120,9 +119,6 @@ export default function App() {
   // Real-time Firestore Sync with Local Storage Fallback
   useEffect(() => {
     if (!user) return;
-
-    // Only set up Firestore listeners if db is properly initialized
-    const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
 
     const loadLocal = (key: string, setter: any) => {
       const stored = localStorage.getItem(`elite_beauty_${key}`);
@@ -193,7 +189,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      if (typeof auth.signOut === 'function') {
+      if (isFirebaseAvailable && auth) {
         await signOut(auth);
       }
       localStorage.removeItem('local_mock_session');
@@ -240,8 +236,6 @@ export default function App() {
   };
 
   // MUTATORS (Mapped to Firestore with Local Failover)
-  const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
-
   const handleAddProduct = async (newProduct: Product) => {
     try {
       if (!isFirebaseAvailable) throw new Error("Firebase unavailable");

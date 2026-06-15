@@ -7,6 +7,7 @@ let app: any;
 let db: any;
 let auth: any;
 let googleProvider: any;
+let isFirebaseAvailable = false;
 
 try {
   if (!getApps().length) {
@@ -17,6 +18,7 @@ try {
   db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
+  isFirebaseAvailable = true;
 } catch (error: any) {
   console.warn("Firebase Client failed to initialize. Running in Local Mode.", error.message);
   // Provide mocks to prevent crashes, but they won't actually "work" for network calls
@@ -24,9 +26,10 @@ try {
   db = {}; 
   auth = { currentUser: null };
   googleProvider = {};
+  isFirebaseAvailable = false;
 }
 
-export { app, db, auth, googleProvider };
+export { app, db, auth, googleProvider, isFirebaseAvailable };
 
 export enum OperationType {
   CREATE = 'create',

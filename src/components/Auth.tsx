@@ -5,7 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword
 } from 'firebase/auth';
-import { auth, googleProvider, db } from '../lib/firebase';
+import { auth, googleProvider, db, isFirebaseAvailable } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, Sparkles, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
@@ -20,16 +20,16 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
   const [error, setError] = useState<string | null>(null);
 
   // Form states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('saved_email') || '');
+  const [password, setPassword] = useState(() => localStorage.getItem('saved_password') || '');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [fullName, setFullName] = useState(() => localStorage.getItem('saved_fullname') || '');
+
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
     try {
-      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
       
       if (!isFirebaseAvailable) {
         // Local simulation for Google Login
@@ -121,7 +121,11 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
     }
 
     try {
-      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
+      localStorage.setItem('saved_email', email);
+      localStorage.setItem('saved_password', password);
+      if (fullName) {
+        localStorage.setItem('saved_fullname', fullName);
+      }
 
       if (!isFirebaseAvailable) {
         // Local simulation for offline/dev preview without backend
@@ -381,7 +385,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
 export function LogoutButton() {
   const handleLogout = async () => {
     try {
-      if (typeof auth.signOut === 'function') {
+      if (isFirebaseAvailable && auth) {
         await signOut(auth);
       }
     } catch (error) {
