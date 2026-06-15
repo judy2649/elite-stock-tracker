@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 let app: any;
@@ -15,7 +15,12 @@ try {
   } else {
     app = getApp();
   }
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  
+  // Use persistentLocalCache for v10+ which replaces enableIndexedDbPersistence
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+  }, firebaseConfig.firestoreDatabaseId);
+
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
   isFirebaseAvailable = true;

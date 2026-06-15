@@ -135,44 +135,100 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
 
         if (mode === 'register') {
           if (users[normalizedEmail]) {
-            throw new Error("User with this email already exists");
+            // User exists, try logging them in auto
+            const existingUser = users[normalizedEmail];
+            if (existingUser.password === password) {
+              localStorage.setItem('local_mock_session', JSON.stringify({ email: existingUser.email, displayName: existingUser.fullName }));
+              onAuthSuccess({ email: existingUser.email, displayName: existingUser.fullName || existingUser.email.split('@')[0] });
+            } else {
+              throw new Error("This email is already registered with a different password.");
+            }
+          } else {
+            users[normalizedEmail] = { email: normalizedEmail, password, fullName };
+            localStorage.setItem('local_mock_users', JSON.stringify(users));
+            localStorage.setItem('local_mock_session', JSON.stringify({ email: normalizedEmail, displayName: fullName }));
+            onAuthSuccess({ email: normalizedEmail, displayName: fullName || normalizedEmail.split('@')[0] });
           }
-          users[normalizedEmail] = { email: normalizedEmail, password, fullName };
-          localStorage.setItem('local_mock_users', JSON.stringify(users));
-          localStorage.setItem('local_mock_session', JSON.stringify({ email: normalizedEmail, displayName: fullName }));
-          onAuthSuccess({ email: normalizedEmail, displayName: fullName || normalizedEmail.split('@')[0] });
         } else {
           // Attempt case-insensitive or exact match
           const user = users[normalizedEmail] || users[email] || Object.values(users).find((u: any) => u.email.toLowerCase() === normalizedEmail);
           
-          if (!user || user.password !== password) {
-            throw new Error("Invalid email or password");
+          if (!user) {
+            // User not found on local login, auto-register them
+            users[normalizedEmail] = { email: normalizedEmail, password, fullName: email.split('@')[0] };
+            localStorage.setItem('local_mock_users', JSON.stringify(users));
+            localStorage.setItem('local_mock_session', JSON.stringify({ email: normalizedEmail, displayName: normalizedEmail.split('@')[0] }));
+            onAuthSuccess({ email: normalizedEmail, displayName: normalizedEmail.split('@')[0] });
+          } else if (user.password !== password) {
+            throw new Error("Invalid password.");
+          } else {
+            localStorage.setItem('local_mock_session', JSON.stringify({ email: user.email, displayName: user.fullName }));
+            onAuthSuccess({ email: user.email, displayName: user.fullName || user.email.split('@')[0] });
           }
-          localStorage.setItem('local_mock_session', JSON.stringify({ email: user.email, displayName: user.fullName }));
-          onAuthSuccess({ email: user.email, displayName: user.fullName || user.email.split('@')[0] });
         }
       } else {
         let user;
         if (mode === 'register') {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          user = userCredential.user;
-          
-          // Try to sync to firestore
           try {
-            const userRef = doc(db, 'users', user.email!);
-            await setDoc(userRef, {
-              userId: user.email,
-              fullName: fullName || user.email?.split('@')[0],
-              email: user.email,
-              role: 'Sales Cashier',
-              createdAt: serverTimestamp()
-            });
-          } catch (e) {
-            console.warn("Firestore user sync failed, continuing", e);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            user = userCredential.user;
+            
+            // Try to sync to firestore
+            try {
+              const userRef = doc(db, 'users', user.email!);
+              await setDoc(userRef, {
+                userId: user.email,
+                fullName: fullName || user.email?.split('@')[0],
+                email: user.email,
+                role: 'Sales Cashier',
+                createdAt: serverTimestamp()
+              });
+            } catch (e) {
+              console.warn("Firestore user sync failed, continuing", e);
+            }
+          } catch (regErr: any) {
+            // If email already in use, auto log them in with this password
+            if (regErr.code === 'auth/email-already-in-use') {
+              console.log("Email already in use, trying to log in instead...");
+              const userCredential = await signInWithEmailAndPassword(auth, email, password);
+              user = userCredential.user;
+            } else {
+              throw regErr;
+            }
           }
         } else {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          user = userCredential.user;
+          try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            user = userCredential.user;
+          } catch (loginErr: any) {
+            // If user not found, auto-register them instead
+            if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential' || loginErr.message?.includes('user-not-found')) {
+              console.log("User not found, trying to register instead...");
+              try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                user = userCredential.user;
+                
+                // Try to sync to firestore
+                try {
+                  const userRef = doc(db, 'users', user.email!);
+                  await setDoc(userRef, {
+                    userId: user.email,
+                    fullName: fullName || user.email?.split('@')[0],
+                    email: user.email,
+                    role: 'Sales Cashier',
+                    createdAt: serverTimestamp()
+                  });
+                } catch (e) {
+                  console.warn("Firestore user sync failed, continuing", e);
+                }
+              } catch (regErr) {
+                // If register fails as well (meaning the email exists and it was just incorrect password), throw original login-err
+                throw loginErr;
+              }
+            } else {
+              throw loginErr;
+            }
+          }
         }
 
         onAuthSuccess({

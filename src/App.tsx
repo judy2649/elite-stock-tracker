@@ -67,9 +67,18 @@ export default function App() {
               const { id, ...data } = item;
               await addDoc(collection(db, collectionName), data);
             }
-            // Remove them to prevent duplicate migrations
-            const clean = parsed.filter((item: any) => !String(item.id).startsWith('local_'));
+            
+            // Fetch fresh to avoid overwriting new data from snapshot
+            const freshStored = localStorage.getItem(`elite_beauty_${key}`);
+            const freshParsed = freshStored ? JSON.parse(freshStored) : [];
+            const clean = freshParsed.filter((item: any) => !String(item.id).startsWith('local_'));
             localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(clean));
+
+            // Clean from state so they don't linger
+            if (key === 'products') setProducts(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+            if (key === 'sales') setSales(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+            if (key === 'expenses') setExpenses(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+            if (key === 'customers') setCustomers(prev => prev.filter(p => !String(p.id).startsWith('local_')));
           }
         } catch (e) {
           console.error(`Migration error for ${key}:`, e);
@@ -128,7 +137,20 @@ export default function App() {
     };
 
     const saveLocal = (key: string, data: any) => {
-      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(data));
+      // Don't overwrite local unmigrated records when saving from firestore!
+      const stored = localStorage.getItem(`elite_beauty_${key}`);
+      let currentLocals: any[] = [];
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          currentLocals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
+        } catch (e) {}
+      }
+      
+      // Merge DB data with local offline items
+      const merged = [...data, ...currentLocals];
+      
+      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(merged));
     };
 
     // Load initial from local for instant feedback
@@ -145,7 +167,12 @@ export default function App() {
 
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Product));
-      setProducts(data);
+      
+      // Set state: Merge DB data with any local items safely
+      setProducts(prev => {
+        const locals = prev.filter(p => p.id.startsWith('local_'));
+        return [...data, ...locals];
+      });
       saveLocal('products', data);
     }, (error) => {
       console.warn("Firestore products sync failed, using local.");
@@ -154,7 +181,10 @@ export default function App() {
 
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
-      setSales(data);
+      setSales(prev => {
+        const locals = prev.filter(p => p.id.startsWith('local_'));
+        return [...data, ...locals];
+      });
       saveLocal('sales', data);
     }, (error) => {
       console.warn("Firestore sales sync failed, using local.");
@@ -163,7 +193,10 @@ export default function App() {
 
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
-      setExpenses(data);
+      setExpenses(prev => {
+        const locals = prev.filter(p => p.id.startsWith('local_'));
+        return [...data, ...locals];
+      });
       saveLocal('expenses', data);
     }, (error) => {
       console.warn("Firestore expenses sync failed, using local.");
@@ -172,7 +205,10 @@ export default function App() {
 
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
-      setCustomers(data);
+      setCustomers(prev => {
+        const locals = prev.filter(p => p.id.startsWith('local_'));
+        return [...data, ...locals];
+      });
       saveLocal('customers', data);
     }, (error) => {
       console.warn("Firestore customers sync failed, using local.");
