@@ -185,25 +185,80 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
       } else {
         let user;
         if (mode === 'register') {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          user = userCredential.user;
-          
-          // Try to sync to firestore
           try {
-            const userRef = doc(db, 'users', user.email!);
-            await setDoc(userRef, {
-              userId: user.email,
-              fullName: fullName || user.email?.split('@')[0],
-              email: user.email,
-              role: getRoleForEmail(user.email),
-              createdAt: serverTimestamp()
-            });
-          } catch (e) {
-            console.warn("Firestore user sync failed, continuing", e);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            user = userCredential.user;
+            
+            // Try to sync to firestore
+            try {
+              const userRef = doc(db, 'users', user.email!);
+              await setDoc(userRef, {
+                userId: user.email,
+                fullName: fullName || user.email?.split('@')[0],
+                email: user.email,
+                role: getRoleForEmail(user.email),
+                createdAt: serverTimestamp()
+              });
+            } catch (e) {
+              console.warn("Firestore user sync failed, continuing", e);
+            }
+          } catch (regErr: any) {
+            if (regErr.code === 'auth/email-already-in-use') {
+              try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                user = userCredential.user;
+              } catch (loginErr: any) {
+                if (loginErr.code === 'auth/invalid-credential' || loginErr.message?.includes('invalid-credential')) {
+                  throw new Error("This email is already registered. The password you entered is incorrect.");
+                } else {
+                  throw loginErr;
+                }
+              }
+            } else {
+              throw regErr;
+            }
           }
         } else {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          user = userCredential.user;
+          try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            user = userCredential.user;
+          } catch (loginErr: any) {
+            if (
+              loginErr.code === 'auth/invalid-credential' || 
+              loginErr.code === 'auth/user-not-found' || 
+              loginErr.message?.includes('invalid-credential') || 
+              loginErr.message?.includes('user-not-found')
+            ) {
+              // Auto-register under the hood since modern Firebase Auth masks user-not-found as invalid-credential
+              try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                user = userCredential.user;
+                
+                // Try to sync to firestore
+                try {
+                  const userRef = doc(db, 'users', user.email!);
+                  await setDoc(userRef, {
+                    userId: user.email,
+                    fullName: fullName || user.email?.split('@')[0],
+                    email: user.email,
+                    role: getRoleForEmail(user.email),
+                    createdAt: serverTimestamp()
+                  });
+                } catch (e) {
+                  console.warn("Firestore user sync failed during auto-registration", e);
+                }
+              } catch (regErr: any) {
+                if (regErr.code === 'auth/email-already-in-use') {
+                  // User already exists, so the login password entered is genuinely wrong
+                  throw loginErr;
+                } else {
+                  throw regErr;
+                }
+              }
+            } else {
+              throw loginErr;
+            }
+          }
         }
 
         onAuthSuccess({
