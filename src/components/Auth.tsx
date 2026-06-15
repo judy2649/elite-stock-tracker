@@ -29,8 +29,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
     setLoading(true);
     setError(null);
     try {
-      // Force bypass Firebase for Google Auth as well
-      const isFirebaseAvailable = false;
+      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
       
       if (!isFirebaseAvailable) {
         // Local simulation for Google Login
@@ -122,8 +121,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
     }
 
     try {
-      // Force local mode for email auth to bypass Firebase
-      const isFirebaseAvailable = false; // Bypass Firebase completely for email auth
+      const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
 
       if (!isFirebaseAvailable) {
         // Local simulation for offline/dev preview without backend

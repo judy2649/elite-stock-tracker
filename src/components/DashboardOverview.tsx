@@ -108,25 +108,23 @@ export default function DashboardOverview({
       </div>
 
       {/* Core Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Sales Metric */}
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-5 rounded-xl border border-zinc-200 shadow-xs relative overflow-hidden"
+          className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm relative"
         >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total Revenue</p>
-              <h3 className="font-space text-2xl font-bold text-zinc-900 mt-2">{formatUGX(totalSalesRevenue)}</h3>
-            </div>
-            <div className="p-2.5 bg-royal-50 rounded-lg text-royal-700 border border-royal-100">
-              <TrendingUp className="w-5 h-5" />
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[13px] font-medium text-zinc-500">Total Revenue</p>
+            <div className="p-1.5 bg-zinc-50 border border-zinc-100 rounded-md text-zinc-600">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3">
+          <h3 className="font-space text-[22px] font-bold text-zinc-900 tracking-tight">{formatUGX(totalSalesRevenue)}</h3>
+          <div className="mt-3 flex items-center justify-between pt-3 border-t border-zinc-100/80">
             <span className="text-xs text-zinc-500">{sales.length} transactions</span>
-            <span className="text-xs font-semibold text-gold-700 bg-gold-100 px-2 py-0.5 rounded">Active Sales</span>
+            <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">Active</span>
           </div>
         </motion.div>
 
@@ -135,22 +133,20 @@ export default function DashboardOverview({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="bg-white p-5 rounded-xl border border-emerald-50 shadow-xs relative overflow-hidden"
+          className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm relative"
         >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 tracking-wider uppercase">Net Profit</p>
-              <h3 className={`font-space text-2xl font-bold mt-2 ${netProfit >= 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
-                {formatUGX(netProfit)}
-              </h3>
-            </div>
-            <div className={`p-2.5 rounded-lg ${netProfit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-              <DollarSign className="w-5 h-5" />
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[13px] font-medium text-zinc-500">Net Profit</p>
+            <div className={`p-1.5 rounded-md border text-zinc-600 ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+              <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-emerald-50/50 pt-3">
-            <span className="text-xs text-zinc-500">COGS: {formatUGX(totalCOGS)}</span>
-            <span className="text-xs text-zinc-500">Expense: {formatUGX(totalOperatingExpenses)}</span>
+          <h3 className={`font-space text-[22px] font-bold tracking-tight ${netProfit >= 0 ? 'text-zinc-900' : 'text-rose-600'}`}>
+            {formatUGX(netProfit)}
+          </h3>
+          <div className="mt-3 flex items-center justify-between pt-3 border-t border-zinc-100/80">
+            <span className="text-[11px] text-zinc-500 truncate mr-2">COGS: {formatUGX(totalCOGS)}</span>
+            <span className="text-[10px] font-medium text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200/50 whitespace-nowrap">Exp: {formatUGX(totalOperatingExpenses)}</span>
           </div>
         </motion.div>
 
@@ -159,20 +155,18 @@ export default function DashboardOverview({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white p-5 rounded-xl border border-zinc-200 shadow-xs"
+          className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm relative"
         >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Inventory Value</p>
-              <h3 className="font-space text-2xl font-bold text-zinc-900 mt-2">{formatUGX(totalCapitalInStock)}</h3>
-            </div>
-            <div className="p-2.5 bg-zinc-100 rounded-lg text-zinc-700">
-              <Package className="w-5 h-5" />
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[13px] font-medium text-zinc-500">Inventory Value</p>
+            <div className="p-1.5 bg-zinc-50 border border-zinc-100 rounded-md text-zinc-600">
+              <Package className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3 text-xs text-zinc-550">
-            <span>Units: {totalStockQuantity}</span>
-            <span>Retail Val: {formatUGX(totalRetailValue)}</span>
+          <h3 className="font-space text-[22px] font-bold text-zinc-900 tracking-tight">{formatUGX(totalCapitalInStock)}</h3>
+          <div className="mt-3 flex items-center justify-between pt-3 border-t border-zinc-100/80">
+            <span className="text-xs text-zinc-500">{totalStockQuantity} units</span>
+            <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-md">Ret: {formatUGX(totalRetailValue)}</span>
           </div>
         </motion.div>
 
@@ -181,28 +175,26 @@ export default function DashboardOverview({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="bg-white p-5 rounded-xl border border-amber-200 shadow-xs"
+          className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm relative"
         >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Urgent Alerts</p>
-              <h3 className="font-space text-2xl font-bold text-amber-800 mt-2">
-                {outOfStockItems.length + lowStockItems.length + expiredItems.length} Warnings
-              </h3>
-            </div>
-            <div className="p-2.5 bg-amber-50 rounded-lg text-amber-600">
-              <AlertTriangle className="w-5 h-5" />
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[13px] font-medium text-zinc-500">Urgent Alerts</p>
+            <div className="p-1.5 bg-rose-50 border border-rose-100 text-rose-600 rounded-md">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-1 border-t border-amber-150 pt-3 text-center text-[10px] font-medium text-zinc-650">
-            <div className="bg-blue-50 text-blue-700 py-1 px-1.5 rounded border border-blue-100">
-              <span className="block font-bold text-xs">{outOfStockItems.length}</span> Out
+          <h3 className="font-space text-[22px] font-bold text-zinc-900 tracking-tight">
+            {outOfStockItems.length + lowStockItems.length + expiredItems.length} Warnings
+          </h3>
+          <div className="mt-3 grid grid-cols-3 gap-1.5 pt-3 border-t border-zinc-100/80">
+            <div className="bg-rose-50/50 border border-rose-100 text-rose-700 py-0.5 px-1 rounded-md flex items-center justify-center gap-1.5 shadow-xs">
+              <span className="font-bold text-[11px]">{outOfStockItems.length}</span><span className="text-[10px]">Out</span>
             </div>
-            <div className="bg-amber-50 text-amber-750 py-1 px-1.5 rounded border border-amber-100">
-              <span className="block font-bold text-xs">{lowStockItems.length}</span> Low
+            <div className="bg-amber-50/50 border border-amber-100 text-amber-700 py-0.5 px-1 rounded-md flex items-center justify-center gap-1.5 shadow-xs">
+              <span className="font-bold text-[11px]">{lowStockItems.length}</span><span className="text-[10px]">Low</span>
             </div>
-            <div className="bg-amber-50/40 text-amber-800 py-1 px-1.5 rounded border border-amber-200/50">
-              <span className="block font-bold text-xs">{expiredItems.length}</span> Exp.
+            <div className="bg-blue-50/50 border border-blue-100 text-blue-700 py-0.5 px-1 rounded-md flex items-center justify-center gap-1.5 shadow-xs">
+              <span className="font-bold text-[11px]">{expiredItems.length}</span><span className="text-[10px]">Exp</span>
             </div>
           </div>
         </motion.div>
