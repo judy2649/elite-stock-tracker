@@ -247,8 +247,8 @@ export default function App() {
       if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
       const { id, ...data } = newProduct;
       await addDoc(collection(db, 'products'), data);
-    } catch (error) {
-      console.warn("Firestore CREATE failed, bypassing to local.");
+    } catch (error: any) {
+      console.warn("Firestore CREATE failed, bypassing to local:", error.message || error);
       const updated = [...products, { ...newProduct, id: `local_${Date.now()}` }];
       setProducts(updated);
       localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
