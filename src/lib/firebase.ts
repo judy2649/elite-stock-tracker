@@ -45,7 +45,18 @@ try {
   // Provide mocks to prevent crashes, but they won't actually "work" for network calls
   app = {};
   db = {}; 
-  auth = { currentUser: null };
+  auth = { 
+    currentUser: null,
+    onAuthStateChanged: (callback: any) => {
+      // Fire callback with null to indicate no logged-in user
+      setTimeout(() => callback?.(null), 50);
+      return () => {};
+    },
+    onIdTokenChanged: (callback: any) => {
+      setTimeout(() => callback?.(null), 50);
+      return () => {};
+    }
+  };
   googleProvider = {};
   isFirebaseAvailable = false;
 }

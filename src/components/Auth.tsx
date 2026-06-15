@@ -272,6 +272,8 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
       let userFriendlyMessage = "";
       if (error.code === 'auth/invalid-credential' || error.message?.includes('invalid-credential')) {
         userFriendlyMessage = "Incorrect password or account details. If you forgot your password, enter your email and click 'Reset Password' below, or claim immediate Guest Mode access.";
+      } else if (error.code === 'auth/operation-not-allowed' || error.message?.includes('operation-not-allowed')) {
+        userFriendlyMessage = "Email/Password sign-in is NOT enabled in your Firebase Console. Please go to your Firebase Console > Authentication > Sign-in method, click 'Email/Password' and enable it. Or use Offline Escape Mode to start using the system instantly code-free!";
       } else if (error.code === 'auth/email-already-in-use') {
         userFriendlyMessage = "This email is already in use. Please select 'Login' instead of 'Register' to access your account.";
       } else if (error.code === 'auth/weak-password') {
@@ -279,7 +281,8 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
       } else if (error.code === 'auth/invalid-email') {
         userFriendlyMessage = "The email format is invalid. Please double-check spelling.";
       } else if (error.code === 'auth/unauthorized-domain' || error.message?.includes('unauthorized-domain')) {
-        userFriendlyMessage = "This domain is not yet authorized in Firebase Console > Authentication > Settings. Please add it, or log in instantly using Offline Escape button.";
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your current domain';
+        userFriendlyMessage = "Domain '" + hostname + "' has not been authorized in your Firebase console. Please add '" + hostname + "' under Authentication > Settings > Authorized domains. For now, try Offline Escape Mode.";
       } else {
         userFriendlyMessage = error.message || "Authentication failed. Try again.";
       }
@@ -491,28 +494,28 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
             <motion.div 
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-[11px] text-red-400 bg-red-950/40 border border-red-500/30 p-3 rounded-xl font-medium space-y-2"
+              className="text-[11px] text-red-400 bg-red-950/45 border border-red-500/40 p-4 rounded-xl font-medium space-y-3"
             >
-              <p>{error}</p>
-              {error.includes("password") && (
-                <div className="pt-1 flex gap-2">
+              <p className="leading-relaxed">{error}</p>
+              <div className="pt-2 border-t border-red-500/20 flex flex-wrap gap-2">
+                {error.includes("password") && (
                   <button
                     type="button"
                     onClick={handleResetPassword}
-                    className="px-2 py-1 text-[10px] bg-red-500/20 text-red-200 border border-red-500/30 hover:bg-gold-500 hover:text-black hover:border-gold-400 rounded transition-all font-bold"
+                    className="px-2.5 py-1.5 text-[10px] bg-red-500/20 text-red-200 border border-red-500/30 hover:bg-gold-500 hover:text-black hover:border-gold-400 rounded-lg transition-all font-bold"
                   >
                     Reset Password Now
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleOfflineBypass}
-                    className="px-2 py-1 text-[10px] bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-700 rounded transition-all font-bold flex items-center gap-1"
-                  >
-                    <WifiOff className="w-3 h-3" />
-                    Offline Bypass
-                  </button>
-                </div>
-              )}
+                )}
+                <button
+                  type="button"
+                  onClick={handleOfflineBypass}
+                  className="px-2.5 py-1.5 text-[10px] bg-zinc-800 text-zinc-100 border border-zinc-700 hover:bg-zinc-700 hover:text-white rounded-lg transition-all font-bold flex items-center gap-1.5"
+                >
+                  <WifiOff className="w-3.5 h-3.5 text-gold-500" />
+                  Bypass & Enter Offline
+                </button>
+              </div>
             </motion.div>
           )}
 
