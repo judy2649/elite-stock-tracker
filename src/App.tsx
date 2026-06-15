@@ -50,6 +50,43 @@ export default function App() {
 
   const user = firebaseUser || localUser;
 
+  // Auto-migrate local data to Firestore once connection is open
+  useEffect(() => {
+    if (!user) return;
+    const isFirebaseAvailable = typeof db.type === 'string' || (db.app && db.type === 'firestore');
+    if (!isFirebaseAvailable) return;
+
+    const migrateLocals = async (key: string, collectionName: string) => {
+      const stored = localStorage.getItem(`elite_beauty_${key}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const locals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
+          if (locals.length > 0) {
+            console.log(`Migrating ${locals.length} local ${key} to Firestore...`);
+            for (const item of locals) {
+              const { id, ...data } = item;
+              await addDoc(collection(db, collectionName), data);
+            }
+            // Remove them to prevent duplicate migrations
+            const clean = parsed.filter((item: any) => !String(item.id).startsWith('local_'));
+            localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(clean));
+          }
+        } catch (e) {
+          console.error(`Migration error for ${key}:`, e);
+        }
+      }
+    };
+
+    const runMigrations = async () => {
+      await migrateLocals('products', 'products');
+      await migrateLocals('sales', 'sales');
+      await migrateLocals('expenses', 'expenses');
+      await migrateLocals('customers', 'customers');
+    };
+    runMigrations();
+  }, [user]);
+
   // Initialize Auth State (Fallback to Local Mock if Firebase absent)
   useEffect(() => {
     if (!loading) {
