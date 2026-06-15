@@ -129,22 +129,25 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
         // Local simulation for offline/dev preview without backend
         const usersStored = localStorage.getItem('local_mock_users') || "{}";
         const users = JSON.parse(usersStored);
+        const normalizedEmail = email.trim().toLowerCase();
 
         if (mode === 'register') {
-          if (users[email]) {
+          if (users[normalizedEmail]) {
             throw new Error("User with this email already exists");
           }
-          users[email] = { email, password, fullName };
+          users[normalizedEmail] = { email: normalizedEmail, password, fullName };
           localStorage.setItem('local_mock_users', JSON.stringify(users));
-          localStorage.setItem('local_mock_session', JSON.stringify({ email, displayName: fullName }));
-          onAuthSuccess({ email, displayName: fullName || email.split('@')[0] });
+          localStorage.setItem('local_mock_session', JSON.stringify({ email: normalizedEmail, displayName: fullName }));
+          onAuthSuccess({ email: normalizedEmail, displayName: fullName || normalizedEmail.split('@')[0] });
         } else {
-          const user = users[email];
+          // Attempt case-insensitive or exact match
+          const user = users[normalizedEmail] || users[email] || Object.values(users).find((u: any) => u.email.toLowerCase() === normalizedEmail);
+          
           if (!user || user.password !== password) {
             throw new Error("Invalid email or password");
           }
-          localStorage.setItem('local_mock_session', JSON.stringify({ email, displayName: user.fullName }));
-          onAuthSuccess({ email, displayName: user.fullName || email.split('@')[0] });
+          localStorage.setItem('local_mock_session', JSON.stringify({ email: user.email, displayName: user.fullName }));
+          onAuthSuccess({ email: user.email, displayName: user.fullName || user.email.split('@')[0] });
         }
       } else {
         let user;
