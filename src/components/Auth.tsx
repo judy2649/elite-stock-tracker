@@ -12,6 +12,17 @@ import { LogIn, Sparkles, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-r
 // @ts-ignore
 import eliteBeautyBadge from '../assets/images/elite_beauty_badge_1781372578945.jpg';
 
+const ADMIN_EMAILS = [
+  'islamnakibinge@gmail.com',
+  'sonyaesther8@gmail.com',
+  'judithoyoo64@gmail.com'
+].map(e => e.toLowerCase());
+
+const getRoleForEmail = (email: string | null | undefined): string => {
+  if (!email) return 'Sales Cashier';
+  return ADMIN_EMAILS.includes(email.toLowerCase()) ? 'Owner / Manager' : 'Sales Cashier';
+};
+
 type AuthMode = 'login' | 'register';
 
 export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) {
@@ -64,7 +75,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
             userId: user.email,
             fullName: user.displayName || user.email?.split('@')[0],
             email: user.email,
-            role: 'Sales Cashier',
+            role: getRoleForEmail(user.email),
             createdAt: serverTimestamp()
           });
         }
@@ -180,7 +191,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
                 userId: user.email,
                 fullName: fullName || user.email?.split('@')[0],
                 email: user.email,
-                role: 'Sales Cashier',
+                role: getRoleForEmail(user.email),
                 createdAt: serverTimestamp()
               });
             } catch (e) {
@@ -215,7 +226,7 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
                     userId: user.email,
                     fullName: fullName || user.email?.split('@')[0],
                     email: user.email,
-                    role: 'Sales Cashier',
+                    role: getRoleForEmail(user.email),
                     createdAt: serverTimestamp()
                   });
                 } catch (e) {

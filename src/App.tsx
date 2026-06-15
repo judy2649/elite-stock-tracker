@@ -95,6 +95,25 @@ export default function App() {
     runMigrations();
   }, [user]);
 
+  // Enforce Admin Roles on login just to guarantee older documents get upgraded
+  useEffect(() => {
+    if (!user || (!user.email)) return;
+    const enforceRoles = async () => {
+      const email = user.email.toLowerCase();
+      const adminEmails = ['islamnakibinge@gmail.com', 'sonyaesther8@gmail.com', 'judithoyoo64@gmail.com'];
+      if (adminEmails.includes(email) && isFirebaseAvailable) {
+        try {
+          await setDoc(doc(db, 'users', email), {
+            role: 'Owner / Manager'
+          }, { merge: true });
+        } catch (e) {
+          console.warn('Failed to enforce admin role');
+        }
+      }
+    };
+    enforceRoles();
+  }, [user]);
+
   // Initialize Auth State (Fallback to Local Mock if Firebase absent)
   useEffect(() => {
     if (!loading) {
