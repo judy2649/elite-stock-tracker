@@ -16,10 +16,22 @@ try {
     app = getApp();
   }
   
-  // Use persistentLocalCache for v10+ which replaces enableIndexedDbPersistence
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
-  }, firebaseConfig.firestoreDatabaseId);
+  // Try to initialize with persistence, slide back gracefully to normal on fail
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+    }, firebaseConfig.firestoreDatabaseId);
+    console.log("Firestore initialized with persistent local cache.");
+  } catch (persistError: any) {
+    console.warn("Failed to initialize Firestore with persistent cache, falling back to standard Firestore:", persistError.message);
+    try {
+      db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      console.log("Firestore initialized normally (memory-only/standard cache).");
+    } catch (defaultError: any) {
+      console.error("Firestore completely failed to initialize:", defaultError.message);
+      throw defaultError;
+    }
+  }
 
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
