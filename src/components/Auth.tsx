@@ -3,12 +3,13 @@ import {
   signOut, 
   signInWithPopup,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, googleProvider, db, isFirebaseAvailable } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, Sparkles, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { LogIn, Sparkles, Mail, Lock, User, ArrowRight, Loader2, KeyRound, WifiOff } from 'lucide-react';
 // @ts-ignore
 import eliteBeautyBadge from '../assets/images/elite_beauty_badge_1781372578945.jpg';
 
@@ -29,6 +30,10 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Password Reset States
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Form states
   const [email, setEmail] = useState(() => localStorage.getItem('saved_email') || '');
@@ -249,14 +254,63 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
         });
       }
     } catch (error: any) {
-      if (error.code === 'auth/unauthorized-domain') {
-        setError("Domain not authorized in Firebase. Please add this URL to Firebase Console > Authentication > Settings > Authorized domains.");
+      console.error("Auth Failure Detail:", error);
+      let userFriendlyMessage = "";
+      if (error.code === 'auth/invalid-credential' || error.message?.includes('invalid-credential')) {
+        userFriendlyMessage = "Incorrect password or account details. If you forgot your password, enter your email and click 'Reset Password' below, or claim immediate Guest Mode access.";
+      } else if (error.code === 'auth/email-already-in-use') {
+        userFriendlyMessage = "This email is already in use. Please select 'Login' instead of 'Register' to access your account.";
+      } else if (error.code === 'auth/weak-password') {
+        userFriendlyMessage = "Password is too weak. It must be at least 6 characters long.";
+      } else if (error.code === 'auth/invalid-email') {
+        userFriendlyMessage = "The email format is invalid. Please double-check spelling.";
+      } else if (error.code === 'auth/unauthorized-domain' || error.message?.includes('unauthorized-domain')) {
+        userFriendlyMessage = "This domain is not yet authorized in Firebase Console > Authentication > Settings. Please add it, or log in instantly using Offline Escape button.";
       } else {
-        setError(error.message || "Authentication failed");
+        userFriendlyMessage = error.message || "Authentication failed. Try again.";
       }
+      setError(userFriendlyMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email.trim()) {
+      setError("Please type your email address first so we know where to send the reset instructions.");
+      return;
+    }
+    setResetLoading(true);
+    setError(null);
+    setResetSent(false);
+    try {
+      if (isFirebaseAvailable && auth) {
+        await sendPasswordResetEmail(auth, email.trim());
+        setResetSent(true);
+        setError(null);
+      } else {
+        setError("Firebase service is offline. Logging in via offline mode is recommended.");
+      }
+    } catch (err: any) {
+      console.error("Reset Password Failed:", err);
+      let resetMsg = "Failed to send reset email.";
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email' || err.message?.includes('invalid-credential') || err.message?.includes('user-not-found')) {
+        resetMsg = "We couldn't find any account matching this email. Please verify spelling or register a new account on the Register tab.";
+      } else {
+        resetMsg = err.message || resetMsg;
+      }
+      setError(resetMsg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleOfflineBypass = () => {
+    setError(null);
+    const bypassEmail = email.trim().toLowerCase() || "judithoyoo64@gmail.com";
+    const bypassName = fullName.trim() || bypassEmail.split('@')[0];
+    localStorage.setItem('local_mock_session', JSON.stringify({ email: bypassEmail, displayName: bypassName }));
+    onAuthSuccess({ email: bypassEmail, displayName: bypassName });
   };
 
   return (
@@ -352,7 +406,24 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Password</label>
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Password</label>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={resetLoading}
+                  className="text-[10px] text-gold-500 hover:text-gold-400 font-bold transition-all flex items-center gap-1"
+                >
+                  {resetLoading ? (
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  ) : (
+                    <KeyRound className="w-2.5 h-2.5" />
+                  )}
+                  {resetSent ? "Reset Link Sent!" : "Forgot? Reset Password"}
+                </button>
+              )}
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
               <input
@@ -392,14 +463,43 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
             )}
           </AnimatePresence>
 
-          {error && (
+          {resetSent && (
             <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-[10px] text-red-500 bg-red-500/10 border border-red-500/20 p-2 rounded-lg font-bold"
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-xl font-medium"
             >
-              {error}
+              Password recovery link successfully sent to <strong>{email}</strong>! Please check your email inbox and spam folder to select your new credentials.
             </motion.p>
+          )}
+
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-[11px] text-red-400 bg-red-950/40 border border-red-500/30 p-3 rounded-xl font-medium space-y-2"
+            >
+              <p>{error}</p>
+              {error.includes("password") && (
+                <div className="pt-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="px-2 py-1 text-[10px] bg-red-500/20 text-red-200 border border-red-500/30 hover:bg-gold-500 hover:text-black hover:border-gold-400 rounded transition-all font-bold"
+                  >
+                    Reset Password Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOfflineBypass}
+                    className="px-2 py-1 text-[10px] bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-700 rounded transition-all font-bold flex items-center gap-1"
+                  >
+                    <WifiOff className="w-3 h-3" />
+                    Offline Bypass
+                  </button>
+                </div>
+              )}
+            </motion.div>
           )}
 
           <button
@@ -425,14 +525,26 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
           </div>
         </div>
 
-        <button
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full py-3.5 px-4 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
-        >
-          <img src="https://www.google.com/favicon.ico" className="w-4 h-4 grayscale opacity-70" alt="" />
-          Continue with Google
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full py-3.5 px-4 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-gold-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+          >
+            <img src="https://www.google.com/favicon.ico" className="w-4 h-4 grayscale opacity-70" alt="" />
+            Continue with Google
+          </button>
+
+          <button
+            onClick={handleOfflineBypass}
+            disabled={loading}
+            type="button"
+            className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2.5 active:scale-[0.98]"
+          >
+            <WifiOff className="w-4 h-4 text-zinc-500" />
+            Enter in Offline Escape Mode
+          </button>
+        </div>
 
         <div className="text-center space-y-4">
           <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-black">
