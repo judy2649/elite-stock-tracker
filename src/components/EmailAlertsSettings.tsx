@@ -40,6 +40,7 @@ export default function EmailAlertsSettings({ products }: EmailAlertsSettingsPro
 
   // Dispatch logs state
   const [logs, setLogs] = useState<AlertEmailLog[]>([]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   
   // Modal preview target
   const [previewLog, setPreviewLog] = useState<AlertEmailLog | null>(null);
@@ -245,11 +246,14 @@ Kampala, Uganda`,
   };
 
   const handleClearLogs = () => {
-    if (confirm('Are you sure you want to clear the alert dispatch logs history?')) {
-      setLogs([]);
-      localStorage.setItem('elite_beauty_alert_logs', JSON.stringify([]));
-      showToast('Dispatch logs cleared!');
-    }
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearLogs = () => {
+    setLogs([]);
+    localStorage.setItem('elite_beauty_alert_logs', JSON.stringify([]));
+    setShowClearConfirm(false);
+    showToast('Dispatch logs cleared!');
   };
 
   return (
@@ -610,6 +614,39 @@ Kampala, Uganda`,
                 </button>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CLEAR LOGS CONFIRM MODAL */}
+      <AnimatePresence>
+        {showClearConfirm && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Clear History?</h3>
+              <p className="text-gray-600 text-sm mb-6">
+                Are you sure you want to clear all dispatch logs? This will permanently remove the audit history of sent alert emails.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmClearLogs}
+                  className="px-4 py-2 text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition shadow-sm"
+                >
+                  Clear Logs
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

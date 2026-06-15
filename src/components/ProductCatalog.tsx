@@ -22,6 +22,35 @@ import { Product, Sale, SaleItem } from '../types';
 import { COSMETICS_CATEGORIES } from '../data';
 import { formatUGX, getExpiryStatus } from '../utils';
 
+// @ts-ignore
+import glutathioneCleanserImg from '../assets/images/glutathione_cleanser_1781537823353.jpg';
+// @ts-ignore
+import skincareScrubImg from '../assets/images/skincare_scrub_1781537841102.jpg';
+// @ts-ignore
+import blemishcareShowergelImg from '../assets/images/blemishcare_showergel_1781537859264.jpg';
+// @ts-ignore
+import skduchesShowergelImg from '../assets/images/skduches_showergel_1781537877337.jpg';
+// @ts-ignore
+import paudeluneShowergelImg from '../assets/images/paudelune_showergel_1781537894028.jpg';
+
+const PRESET_IMAGES = [
+  { key: 'glutathione_cleanser', name: 'Facial Cleanser', url: glutathioneCleanserImg },
+  { key: 'skincare_scrub', name: 'Body Scrub', url: skincareScrubImg },
+  { key: 'blemishcare_showergel', name: 'Blemishcare Wash', url: blemishcareShowergelImg },
+  { key: 'skduches_showergel', name: 'SK Duches Gel', url: skduchesShowergelImg },
+  { key: 'paudelune_showergel', name: 'PauDeLune Gel', url: paudeluneShowergelImg },
+];
+
+const getCleanImageKey = (url: string): string => {
+  if (!url) return '';
+  if (url.includes('glutathione_cleanser')) return 'glutathione_cleanser';
+  if (url.includes('skincare_scrub')) return 'skincare_scrub';
+  if (url.includes('blemishcare_showergel')) return 'blemishcare_showergel';
+  if (url.includes('skduches_showergel')) return 'skduches_showergel';
+  if (url.includes('paudelune_showergel')) return 'paudelune_showergel';
+  return url;
+};
+
 interface ProductCatalogProps {
   products: Product[];
   sales: Sale[];
@@ -81,6 +110,7 @@ export default function ProductCatalog({
   // Edit or Add Item Modal/Form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   // Single Item quick stock-in adjustment states
   const [stockInProduct, setStockInProduct] = useState<Product | null>(null);
@@ -188,7 +218,7 @@ export default function ProductCatalog({
     setFormQuantity(p.quantity);
     setFormSafeLevel(p.safeLevel);
     setFormExpiryDate(p.expiryDate);
-    setFormImageUrl(p.imageUrl);
+    setFormImageUrl(getCleanImageKey(p.imageUrl));
     setFormDescription(p.description || '');
     setFormBatchNumber(p.batchNumber || '');
     setFormShadeVariantsStr(p.shadeVariants ? p.shadeVariants.join(', ') : '');
@@ -231,7 +261,8 @@ export default function ProductCatalog({
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalImage = formImageUrl.trim() || 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&auto=format&fit=crop';
+    const rawImage = formImageUrl.trim() || 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&auto=format&fit=crop';
+    const finalImage = getCleanImageKey(rawImage);
     const parsedShades = formShadeVariantsStr.trim()
       ? formShadeVariantsStr.split(',').map(s => s.trim()).filter(Boolean)
       : undefined;
@@ -680,11 +711,7 @@ export default function ProductCatalog({
 
                         {/* Delete entry */}
                         <button
-                          onClick={() => {
-                            if (confirm(`Do you want to permanently delete "${p.name}"?`)) {
-                              onDeleteProduct(p.id);
-                            }
-                          }}
+                          onClick={() => setProductToDelete(p)}
                           className="p-1.5 text-zinc-300 hover:text-red-600 rounded hover:bg-rose-50"
                           title="Purge Listing"
                         >
@@ -918,6 +945,51 @@ export default function ProductCatalog({
 
       {/* DETAILED ADD / EDIT PRODUCT MODAL FORM */}
       <AnimatePresence>
+        {productToDelete && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ bg: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 text-rose-600 mb-4">
+                  <div className="bg-rose-100 p-2 rounded-full">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 leading-tight">Delete Product</h3>
+                </div>
+                
+                <p className="text-gray-600 text-sm mb-6">
+                  Are you sure you want to permanently delete <strong className="text-gray-900">"{productToDelete.name}"</strong>? This action cannot be undone and it will be removed from your stock inventory.
+                </p>
+
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setProductToDelete(null)}
+                    className="px-4 py-2 font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDeleteProduct(productToDelete.id);
+                      setProductToDelete(null);
+                    }}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition shadow-md shadow-rose-200 active:scale-95"
+                  >
+                    Permanently Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showAddForm && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div 
@@ -1071,6 +1143,44 @@ export default function ProductCatalog({
                     Product Picture / Media Cover
                   </span>
 
+                  {/* PRESETS */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block text-[10px] font-extrabold text-rose-700 uppercase tracking-wider">
+                      Quick choice: original cosmetics picture presets
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {PRESET_IMAGES.map((preset) => {
+                        const isSelected = formImageUrl === preset.key;
+                        return (
+                          <button
+                            key={preset.key}
+                            type="button"
+                            onClick={() => setFormImageUrl(preset.key)}
+                            className={`flex flex-col items-center p-1.5 border rounded-lg transition text-left group gap-1 hover:border-rose-400 hover:bg-rose-50/20 active:scale-95 ${
+                              isSelected
+                                ? 'border-rose-500 bg-rose-50/40 ring-1 ring-rose-500/30'
+                                : 'border-rose-100/60 bg-white'
+                            }`}
+                          >
+                            <div className="aspect-square w-full rounded overflow-hidden border border-gray-100 relative bg-gray-50 flex items-center justify-center shrink-0">
+                              <img src={preset.url} alt={preset.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-white/40 flex items-center justify-center">
+                                  <span className="p-0.5 bg-rose-650 rounded-full text-white">
+                                    <Check className="w-2 h-2" />
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[8px] font-bold text-gray-500 truncate w-full text-center group-hover:text-rose-700">
+                              {preset.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                     
                     {/* Visual Preview Thumbnail */}
@@ -1078,7 +1188,14 @@ export default function ProductCatalog({
                       {formImageUrl ? (
                         <>
                           <img 
-                            src={formImageUrl} 
+                            src={
+                              formImageUrl === 'glutathione_cleanser' ? glutathioneCleanserImg :
+                              formImageUrl === 'skincare_scrub' ? skincareScrubImg :
+                              formImageUrl === 'blemishcare_showergel' ? blemishcareShowergelImg :
+                              formImageUrl === 'skduches_showergel' ? skduchesShowergelImg :
+                              formImageUrl === 'paudelune_showergel' ? paudeluneShowergelImg :
+                              formImageUrl
+                            } 
                             alt="Cosmetic product view" 
                             className="w-full h-full object-cover rounded-md"
                           />

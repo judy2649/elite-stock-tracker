@@ -235,18 +235,22 @@ export default function App() {
     ];
 
     // 1. Force sync to Local State & Storage first for absolute guarantee and instant view
+    const deletedJson = localStorage.getItem('elite_beauty_deleted_products');
+    const delIds: string[] = deletedJson ? JSON.parse(deletedJson) : [];
+    const missingFiltered = missingProducts.filter(p => !delIds.includes(p.id));
+
     setProducts(prev => {
-      const filteredPrev = prev.filter(p => !missingProducts.some(m => m.sku === p.sku));
-      const merged = [...filteredPrev, ...missingProducts];
+      const filteredPrev = prev.filter(p => !missingFiltered.some(m => m.sku === p.sku) && !delIds.includes(p.id));
+      const merged = [...filteredPrev, ...missingFiltered];
       localStorage.setItem('elite_beauty_products', JSON.stringify(merged));
       return merged;
     });
 
     // 2. Synchronize to Firestore if online
-    if (isFirebaseAvailable && db) {
+    if (isFirebaseAvailable && db && missingFiltered.length > 0) {
       try {
         console.log("Seeding Sonya's skincare products to Firestore...");
-        for (const prod of missingProducts) {
+        for (const prod of missingFiltered) {
           const { id, ...data } = prod;
           await setDoc(doc(db, 'products', id), data, { merge: true });
         }
@@ -289,15 +293,25 @@ export default function App() {
 
   // Firestore Shared State
   const [products, setProducts] = useState<Product[]>([]);
+  const [deletedProductIds, setDeletedProductIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('elite_beauty_deleted_products');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Render-time mapping of abstract product image URLs to local Vite bundled assets
-  const enrichedProducts = products.map(p => ({
-    ...p,
-    imageUrl: IMAGE_MAPPING[p.imageUrl as string] || p.imageUrl || 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200'
-  }));
+  const enrichedProducts = products
+    .filter(p => !deletedProductIds.includes(p.id))
+    .map(p => ({
+      ...p,
+      imageUrl: IMAGE_MAPPING[p.imageUrl as string] || p.imageUrl || 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200'
+    }));
 
   // Real-time Firestore Sync with Local Storage Fallback
   useEffect(() => {
@@ -306,7 +320,15 @@ export default function App() {
     const loadLocal = (key: string, setter: any) => {
       const stored = localStorage.getItem(`elite_beauty_${key}`);
       if (stored) {
-        try { setter(JSON.parse(stored)); } catch (e) {}
+        try {
+          let parsed = JSON.parse(stored);
+          if (key === 'products') {
+            const delStored = localStorage.getItem('elite_beauty_deleted_products');
+            const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+            parsed = parsed.filter((item: any) => !delIds.includes(item.id));
+          }
+          setter(parsed);
+        } catch (e) {}
       }
     };
 
@@ -340,7 +362,12 @@ export default function App() {
       }
 
       // Merge DB data with filtered local items
-      const merged = [...data, ...filteredLocals];
+      let merged = [...data, ...filteredLocals];
+      if (key === 'products') {
+        const delStored = localStorage.getItem('elite_beauty_deleted_products');
+        const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+        merged = merged.filter((item: any) => !delIds.includes(item.id));
+      }
       
       localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(merged));
     };
@@ -358,11 +385,17 @@ export default function App() {
     }
 
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Product));
+      const delStored = localStorage.getItem('elite_beauty_deleted_products');
+      const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+
+      const data = snapshot.docs
+        .map(d => ({ ...d.data(), id: d.id } as Product))
+        .filter(p => !delIds.includes(p.id));
       
       // Set state: Merge DB data with any local items safely and deduplicate
       setProducts(prev => {
         const locals = prev.filter(p => 
+          !delIds.includes(p.id) &&
           (p.id.startsWith('local_') || p.id.startsWith('prod-')) &&
           !data.some(d => d.sku === p.sku || d.name.toLowerCase() === p.name.toLowerCase())
         );
@@ -491,7 +524,7 @@ export default function App() {
     try {
       if (!isFirebaseAvailable) return;
       const { id, ...data } = optimisticProduct;
-      await addDoc(collection(db, 'products'), data);
+      await setDoc(doc(db, 'products', id), data);
     } catch (error: any) {
       console.warn("Firestore CREATE failed, cached locally:", error.message || error);
     }
@@ -503,33 +536,37 @@ export default function App() {
     setProducts(updated);
     localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
 
-    // If it's a purely local unsynced item, do not try writing to Firestore
-    if (updatedProduct.id.startsWith('local_') || updatedProduct.id.startsWith('prod-')) return;
+    // If Firebase is unavailable, local state already handles it
+    if (!isFirebaseAvailable) return;
 
     try {
-      if (!isFirebaseAvailable) return;
       const { id, ...data } = updatedProduct;
-      await updateDoc(doc(db, 'products', id), data);
+      await setDoc(doc(db, 'products', id), data, { merge: true });
     } catch (error) {
       console.warn("Firestore UPDATE failed, cached locally:", error);
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    // If it's a local offline item, or if Firebase is unavailable, delete it locally right away
-    if (productId.startsWith('local_') || productId.startsWith('prod-') || !isFirebaseAvailable) {
-      const updated = products.filter(p => p.id !== productId);
-      setProducts(updated);
-      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    // 1. Keep track of user-deleted products to prevent sync-reversions or re-seeding
+    const currentDeletedJson = localStorage.getItem('elite_beauty_deleted_products');
+    let currentDeleted: string[] = currentDeletedJson ? JSON.parse(currentDeletedJson) : [];
+    if (!currentDeleted.includes(productId)) {
+      currentDeleted.push(productId);
+      localStorage.setItem('elite_beauty_deleted_products', JSON.stringify(currentDeleted));
+      setDeletedProductIds(currentDeleted);
+    }
+
+    // Remove locally first for immediate responsiveness
+    const updated = products.filter(p => p.id !== productId);
+    setProducts(updated);
+    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+
+    if (!isFirebaseAvailable) {
       return;
     }
 
     try {
-      // Remove locally first for immediate responsiveness
-      const updated = products.filter(p => p.id !== productId);
-      setProducts(updated);
-      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
-
       await deleteDoc(doc(db, 'products', productId));
     } catch (error) {
       console.warn("Firestore DELETE failed, bypassed to local:", error);
@@ -559,13 +596,13 @@ export default function App() {
     try {
       if (!isFirebaseAvailable) return;
       const { id, ...saleData } = optSale;
-      await addDoc(collection(db, 'sales'), saleData);
+      await setDoc(doc(db, 'sales', id), saleData);
 
       for (const saleItem of newSale.items) {
         const product = products.find(p => p.id === saleItem.productId);
-        if (product && !(product.id.startsWith('local_') || product.id.startsWith('prod-'))) {
+        if (product) {
           const newQty = Math.max(0, product.quantity - saleItem.quantity);
-          await updateDoc(doc(db, 'products', product.id), { quantity: newQty });
+          await setDoc(doc(db, 'products', product.id), { quantity: newQty }, { merge: true });
         }
       }
     } catch (error) {
@@ -601,12 +638,12 @@ export default function App() {
         if (remainingPayment <= 0) break;
         const debt = sale.balanceDue;
         const toPay = Math.min(remainingPayment, debt);
-        // Only run online update if it's a synced online sale
-        if (!(sale.id.startsWith('local_') || sale.id.startsWith('sale-'))) {
-          await updateDoc(doc(db, 'sales', sale.id), {
+        // Only run online update if firebase available
+        if (isFirebaseAvailable) {
+          await setDoc(doc(db, 'sales', sale.id), {
             paidAmount: sale.paidAmount + toPay,
             balanceDue: sale.balanceDue - toPay
-          });
+          }, { merge: true });
         }
         remainingPayment -= toPay;
       }
@@ -628,7 +665,7 @@ export default function App() {
     try {
       if (!isFirebaseAvailable) return;
       const { id, ...data } = optCust;
-      await addDoc(collection(db, 'customers'), data);
+      await setDoc(doc(db, 'customers', id), data);
     } catch (error) {
       console.warn("Firestore CUSTOMER failed, cached locally:", error);
     }
@@ -647,15 +684,15 @@ export default function App() {
     try {
       if (!isFirebaseAvailable) return;
       const { id, ...data } = optExp;
-      await addDoc(collection(db, 'expenses'), data);
+      await setDoc(doc(db, 'expenses', id), data);
     } catch (error) {
       console.warn("Firestore EXPENSE failed, cached locally:", error);
     }
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    // If it's a local offline item, or if Firebase is unavailable, delete it locally right away
-    if (expenseId.startsWith('local_') || expenseId.startsWith('exp_') || !isFirebaseAvailable) {
+    // If Firebase is unavailable, delete it locally right away
+    if (!isFirebaseAvailable) {
       const updated = expenses.filter(e => e.id !== expenseId);
       setExpenses(updated);
       localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));

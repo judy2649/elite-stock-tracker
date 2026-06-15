@@ -36,6 +36,7 @@ export default function ExpenseTracker({
   onDeleteExpense
 }: ExpenseTrackerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   
   // Form State
   const [title, setTitle] = useState('');
@@ -167,11 +168,7 @@ export default function ExpenseTracker({
                   </td>
                   <td className="py-3 px-4 text-right">
                     <button
-                      onClick={() => {
-                        if (confirm(`Remove expense log "${e.title}"?`)) {
-                          onDeleteExpense(e.id);
-                        }
-                      }}
+                      onClick={() => setExpenseToDelete(e)}
                       className="p-1 px-1.5 text-zinc-400 hover:text-red-650 rounded hover:bg-zinc-100"
                     >
                       <Trash2 className="w-4.5 h-4.5" />
@@ -191,6 +188,52 @@ export default function ExpenseTracker({
           </table>
         </div>
       </div>
+
+      {/* DELETE EXPENSE MODAL */}
+      <AnimatePresence>
+        {expenseToDelete && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ bg: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 text-red-600 mb-4">
+                  <div className="bg-red-100 p-2 rounded-full">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-zinc-900 leading-tight">Delete Expense</h3>
+                </div>
+                
+                <p className="text-zinc-600 text-sm mb-6">
+                  Are you sure you want to remove the expense record for <strong className="text-zinc-900">"{expenseToDelete.title}"</strong>? This will also update your analytics.
+                </p>
+
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setExpenseToDelete(null)}
+                    className="px-4 py-2 font-bold text-zinc-500 hover:bg-zinc-100 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDeleteExpense(expenseToDelete.id);
+                      setExpenseToDelete(null);
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-md shadow-red-200"
+                  >
+                    Delete Entry
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ADD EXPENSE DIALOG FORM */}
       <AnimatePresence>
