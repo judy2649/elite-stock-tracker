@@ -185,66 +185,25 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
       } else {
         let user;
         if (mode === 'register') {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          user = userCredential.user;
+          
+          // Try to sync to firestore
           try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            user = userCredential.user;
-            
-            // Try to sync to firestore
-            try {
-              const userRef = doc(db, 'users', user.email!);
-              await setDoc(userRef, {
-                userId: user.email,
-                fullName: fullName || user.email?.split('@')[0],
-                email: user.email,
-                role: getRoleForEmail(user.email),
-                createdAt: serverTimestamp()
-              });
-            } catch (e) {
-              console.warn("Firestore user sync failed, continuing", e);
-            }
-          } catch (regErr: any) {
-            // If email already in use, auto log them in with this password
-            if (regErr.code === 'auth/email-already-in-use') {
-              console.log("Email already in use, trying to log in instead...");
-              const userCredential = await signInWithEmailAndPassword(auth, email, password);
-              user = userCredential.user;
-            } else {
-              throw regErr;
-            }
+            const userRef = doc(db, 'users', user.email!);
+            await setDoc(userRef, {
+              userId: user.email,
+              fullName: fullName || user.email?.split('@')[0],
+              email: user.email,
+              role: getRoleForEmail(user.email),
+              createdAt: serverTimestamp()
+            });
+          } catch (e) {
+            console.warn("Firestore user sync failed, continuing", e);
           }
         } else {
-          try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            user = userCredential.user;
-          } catch (loginErr: any) {
-            // If user not found, auto-register them instead
-            if (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential' || loginErr.message?.includes('user-not-found')) {
-              console.log("User not found, trying to register instead...");
-              try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                user = userCredential.user;
-                
-                // Try to sync to firestore
-                try {
-                  const userRef = doc(db, 'users', user.email!);
-                  await setDoc(userRef, {
-                    userId: user.email,
-                    fullName: fullName || user.email?.split('@')[0],
-                    email: user.email,
-                    role: getRoleForEmail(user.email),
-                    createdAt: serverTimestamp()
-                  });
-                } catch (e) {
-                  console.warn("Firestore user sync failed, continuing", e);
-                }
-              } catch (regErr) {
-                // If register fails as well (meaning the email exists and it was just incorrect password), throw original login-err
-                throw loginErr;
-              }
-            } else {
-              throw loginErr;
-            }
-          }
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          user = userCredential.user;
         }
 
         onAuthSuccess({
