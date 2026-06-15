@@ -29,7 +29,8 @@ try {
   if (projectId && !getApps().length) {
     console.log(`Initializing Firebase Admin for Project: ${projectId}`);
     initializeApp({ projectId });
-    firestore = getFirestore(databaseId);
+    const targetDbId = (!databaseId || databaseId === "(default)") ? undefined : databaseId;
+    firestore = getFirestore(targetDbId);
     authAdmin = getAuth();
   } else {
     console.warn("No Firebase Project ID found. Running in Local Auth mode only.");

@@ -1,10 +1,11 @@
 {
-  "projectId": "gen-lang-client-0725054065",
-  "appId": "1:182712243942:web:681cd5dd3a6c0286304d27",
-  "apiKey": "AIzaSyCzA_RFdnceBgGbowEca1syyA2AdBTkj-o",
-  "authDomain": "gen-lang-client-0725054065.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-5e183a95-21d6-4761-b736-0de5ae9c799e",
-  "storageBucket": "gen-lang-client-0725054065.firebasestorage.app",
-  "messagingSenderId": "182712243942",
+  "projectId": "elite-stock-tracker",
+  "appId": "1:220986712273:web:41e97cb82197d311afa5f0",
+  "apiKey": "AIzaSyDCFbzPn_bFfEe89X0pnLRlFLz-9KKhb10",
+  "authDomain": "elite-stock-tracker.firebaseapp.com",
+  "databaseURL": "https://elite-stock-tracker-default-rtdb.firebaseio.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "elite-stock-tracker.firebasestorage.app",
+  "messagingSenderId": "220986712273",
   "measurementId": ""
 }

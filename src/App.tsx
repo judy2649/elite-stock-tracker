@@ -43,6 +43,26 @@ import Auth from './components/Auth';
 // @ts-ignore
 import eliteBeautyBadge from './assets/images/elite_beauty_badge_1781372578945.jpg';
 
+// Sonya's missing products image assets
+// @ts-ignore
+import glutathioneCleanserImg from './assets/images/glutathione_cleanser_1781537823353.jpg';
+// @ts-ignore
+import skincareScrubImg from './assets/images/skincare_scrub_1781537841102.jpg';
+// @ts-ignore
+import blemishcareShowergelImg from './assets/images/blemishcare_showergel_1781537859264.jpg';
+// @ts-ignore
+import skduchesShowergelImg from './assets/images/skduches_showergel_1781537877337.jpg';
+// @ts-ignore
+import paudeluneShowergelImg from './assets/images/paudelune_showergel_1781537894028.jpg';
+
+const IMAGE_MAPPING: Record<string, string> = {
+  'glutathione_cleanser': glutathioneCleanserImg,
+  'skincare_scrub': skincareScrubImg,
+  'blemishcare_showergel': blemishcareShowergelImg,
+  'skduches_showergel': skduchesShowergelImg,
+  'paudelune_showergel': paudeluneShowergelImg,
+};
+
 export default function App() {
   const [firebaseUser, loading] = useAuthState(auth);
   const [localUser, setLocalUser] = useState<any>(null);
@@ -114,6 +134,124 @@ export default function App() {
     enforceRoles();
   }, [user]);
 
+  // Auto-seed missing products added by sonyaesther8@gmail.com if not already present on Firestore
+  useEffect(() => {
+    if (!user) return;
+    if (!isFirebaseAvailable) return;
+
+    const seedMissingProducts = async () => {
+      const missingProducts = [
+        {
+          id: 'prod-ski-261',
+          name: 'Glutathione Facial Cleanser',
+          category: 'Skin Care',
+          sku: 'EB-SKI-261',
+          costPrice: 25000,
+          sellingPrice: 35000,
+          quantity: 0,
+          safeLevel: 5,
+          expiryDate: '2028-06-30',
+          imageUrl: 'glutathione_cleanser',
+          description: 'Deeply cleanses, brightens, and refreshes skin. Formulated with high-quality Glutathione and Vitamin C.',
+          batchNumber: 'B26-2610',
+          locationStocks: {
+            kampala: 0,
+            wandegeya: 0,
+            entebbe: 0,
+          }
+        },
+        {
+          id: 'prod-ski-683',
+          name: 'Organic Body Scrub',
+          category: 'Skin Care',
+          sku: 'EB-SKI-683',
+          costPrice: 15000,
+          sellingPrice: 25000,
+          quantity: 12,
+          safeLevel: 5,
+          expiryDate: '2028-03-15',
+          imageUrl: 'skincare_scrub',
+          description: 'Exfoliating and skin smoothing natural body scrub infused with botanical extracts.',
+          batchNumber: 'B26-6589',
+          locationStocks: {
+            kampala: 12,
+            wandegeya: 0,
+            entebbe: 0,
+          }
+        },
+        {
+          id: 'prod-ski-191',
+          name: 'Blemishcare Showergel /body wash',
+          category: 'Skin Care',
+          sku: 'EB-SKI-191',
+          costPrice: 40000,
+          sellingPrice: 55000,
+          quantity: 0,
+          safeLevel: 3,
+          expiryDate: '2027-12-01',
+          imageUrl: 'blemishcare_showergel',
+          description: 'Acne and spot clearing blemishcare shower gel body wash, ideal for glowing skin.',
+          batchNumber: 'B26-6258',
+          locationStocks: {
+            kampala: 0,
+            wandegeya: 0,
+            entebbe: 0,
+          }
+        },
+        {
+          id: 'prod-ski-832',
+          name: 'Sk duches showergel',
+          category: 'Skin Care',
+          sku: 'EB-SKI-832',
+          costPrice: 35000,
+          sellingPrice: 48000,
+          quantity: 0,
+          safeLevel: 3,
+          expiryDate: '2028-01-20',
+          imageUrl: 'skduches_showergel',
+          description: 'Luxurious gold royal shower gel with long-lasting enchanting scent.',
+          batchNumber: 'B26-5685',
+          locationStocks: {
+            kampala: 0,
+            wandegeya: 0,
+            entebbe: 0,
+          }
+        },
+        {
+          id: 'prod-ski-545',
+          name: 'PauDeLune showergel',
+          category: 'Skin Care',
+          sku: 'EB-SKI-545',
+          costPrice: 38000,
+          sellingPrice: 52000,
+          quantity: 0,
+          safeLevel: 3,
+          expiryDate: '2027-09-10',
+          imageUrl: 'paudelune_showergel',
+          description: 'Premium French spa aromatherapy body wash for intense skin hydration.',
+          batchNumber: 'B26-3742',
+          locationStocks: {
+            kampala: 0,
+            wandegeya: 0,
+            entebbe: 0,
+          }
+        }
+      ];
+
+      try {
+        for (const prod of missingProducts) {
+          const { id, ...data } = prod;
+          await setDoc(doc(db, 'products', id), data, { merge: true });
+        }
+        console.log("Successfully seeded/synced Sonya's missing products.");
+      } catch (err) {
+        console.warn("Seeding Sonya's missing products failed:", err);
+      }
+    };
+
+    seedMissingProducts();
+  }, [user]);
+
   // Initialize Auth State (Fallback to Local Mock if Firebase absent)
   useEffect(() => {
     if (!loading) {
@@ -144,6 +282,12 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
+  // Render-time mapping of abstract product image URLs to local Vite bundled assets
+  const enrichedProducts = products.map(p => ({
+    ...p,
+    imageUrl: IMAGE_MAPPING[p.imageUrl as string] || p.imageUrl || 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200'
+  }));
+
   // Real-time Firestore Sync with Local Storage Fallback
   useEffect(() => {
     if (!user) return;
@@ -162,12 +306,30 @@ export default function App() {
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          currentLocals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
+          currentLocals = parsed.filter((item: any) => 
+            String(item.id).startsWith('local_') || 
+            String(item.id).startsWith('prod-') || 
+            String(item.id).startsWith('sale-') || 
+            String(item.id).startsWith('cust_') || 
+            String(item.id).startsWith('exp_')
+          );
         } catch (e) {}
       }
       
-      // Merge DB data with local offline items
-      const merged = [...data, ...currentLocals];
+      // Filter out any local items that have been merged/saved on firestore
+      let filteredLocals = currentLocals;
+      if (key === 'products') {
+        filteredLocals = currentLocals.filter(p => !data.some((d: any) => d.sku === p.sku || d.name.toLowerCase() === p.name.toLowerCase()));
+      } else if (key === 'sales') {
+        filteredLocals = currentLocals.filter(s => !data.some((d: any) => d.invoiceNumber === s.invoiceNumber));
+      } else if (key === 'customers') {
+        filteredLocals = currentLocals.filter(c => !data.some((d: any) => d.name.toLowerCase() === c.name.toLowerCase() || (d.phone && d.phone === c.phone)));
+      } else if (key === 'expenses') {
+        filteredLocals = currentLocals.filter(e => !data.some((d: any) => d.title === e.title && d.amount === e.amount && d.date === e.date));
+      }
+
+      // Merge DB data with filtered local items
+      const merged = [...data, ...filteredLocals];
       
       localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(merged));
     };
@@ -187,9 +349,12 @@ export default function App() {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Product));
       
-      // Set state: Merge DB data with any local items safely
+      // Set state: Merge DB data with any local items safely and deduplicate
       setProducts(prev => {
-        const locals = prev.filter(p => p.id.startsWith('local_'));
+        const locals = prev.filter(p => 
+          (p.id.startsWith('local_') || p.id.startsWith('prod-')) &&
+          !data.some(d => d.sku === p.sku || d.name.toLowerCase() === p.name.toLowerCase())
+        );
         return [...data, ...locals];
       });
       saveLocal('products', data);
@@ -201,7 +366,10 @@ export default function App() {
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
       setSales(prev => {
-        const locals = prev.filter(p => p.id.startsWith('local_'));
+        const locals = prev.filter(s => 
+          (s.id.startsWith('local_') || s.id.startsWith('sale-')) &&
+          !data.some(d => d.invoiceNumber === s.invoiceNumber)
+        );
         return [...data, ...locals];
       });
       saveLocal('sales', data);
@@ -213,7 +381,10 @@ export default function App() {
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
       setExpenses(prev => {
-        const locals = prev.filter(p => p.id.startsWith('local_'));
+        const locals = prev.filter(e => 
+          (e.id.startsWith('local_') || e.id.startsWith('exp_')) &&
+          !data.some(d => d.title === e.title && d.amount === e.amount && d.date === e.date)
+        );
         return [...data, ...locals];
       });
       saveLocal('expenses', data);
@@ -225,7 +396,10 @@ export default function App() {
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
       const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
       setCustomers(prev => {
-        const locals = prev.filter(p => p.id.startsWith('local_'));
+        const locals = prev.filter(c => 
+          (c.id.startsWith('local_') || c.id.startsWith('cust_')) &&
+          !data.some(d => d.name.toLowerCase() === c.name.toLowerCase() || (d.phone && d.phone === c.phone))
+        );
         return [...data, ...locals];
       });
       saveLocal('customers', data);
@@ -292,76 +466,122 @@ export default function App() {
 
   // MUTATORS (Mapped to Firestore with Local Failover)
   const handleAddProduct = async (newProduct: Product) => {
+    // Optimistically assign a safe local ID if it does not already have a valid prefix
+    const optimisticId = newProduct.id.startsWith('local_') || newProduct.id.startsWith('prod-')
+      ? newProduct.id 
+      : `local_prod_${Date.now()}`;
+    const optimisticProduct = { ...newProduct, id: optimisticId };
+
+    // Update state and localStorage first for instant feedback and durability
+    const updated = [...products, optimisticProduct];
+    setProducts(updated);
+    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      const { id, ...data } = newProduct;
+      if (!isFirebaseAvailable) return;
+      const { id, ...data } = optimisticProduct;
       await addDoc(collection(db, 'products'), data);
     } catch (error: any) {
-      console.warn("Firestore CREATE failed, bypassing to local:", error.message || error);
-      const updated = [...products, { ...newProduct, id: `local_${Date.now()}` }];
-      setProducts(updated);
-      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+      console.warn("Firestore CREATE failed, cached locally:", error.message || error);
     }
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
+    // Optimistically update locally right away
+    const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
+    setProducts(updated);
+    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+
+    // If it's a purely local unsynced item, do not try writing to Firestore
+    if (updatedProduct.id.startsWith('local_') || updatedProduct.id.startsWith('prod-')) return;
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
+      if (!isFirebaseAvailable) return;
       const { id, ...data } = updatedProduct;
       await updateDoc(doc(db, 'products', id), data);
     } catch (error) {
-      console.warn("Firestore UPDATE failed, bypassing to local.");
-      const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
-      setProducts(updated);
-      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+      console.warn("Firestore UPDATE failed, cached locally:", error);
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      await deleteDoc(doc(db, 'products', productId));
-    } catch (error) {
-      console.warn("Firestore DELETE failed, bypassing to local.");
+    // If it's a local offline item, or if Firebase is unavailable, delete it locally right away
+    if (productId.startsWith('local_') || productId.startsWith('prod-') || !isFirebaseAvailable) {
       const updated = products.filter(p => p.id !== productId);
       setProducts(updated);
       localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+      return;
+    }
+
+    try {
+      // Remove locally first for immediate responsiveness
+      const updated = products.filter(p => p.id !== productId);
+      setProducts(updated);
+      localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+
+      await deleteDoc(doc(db, 'products', productId));
+    } catch (error) {
+      console.warn("Firestore DELETE failed, bypassed to local:", error);
     }
   };
 
   const handleRecordSale = async (newSale: Sale) => {
+    // Generate optimistic ID
+    const optimisticId = newSale.id.startsWith('local_') || newSale.id.startsWith('sale-')
+      ? newSale.id
+      : `local_sale_${Date.now()}`;
+    const optSale = { ...newSale, id: optimisticId };
+
+    // Update sales and products state & localStorage optimistically
+    const updatedSales = [optSale, ...sales];
+    setSales(updatedSales);
+    localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
+
+    const updatedProducts = products.map(p => {
+      const item = newSale.items.find(i => i.productId === p.id);
+      if (item) return { ...p, quantity: Math.max(0, p.quantity - item.quantity) };
+      return p;
+    });
+    setProducts(updatedProducts);
+    localStorage.setItem('elite_beauty_products', JSON.stringify(updatedProducts));
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      const { id, ...saleData } = newSale;
+      if (!isFirebaseAvailable) return;
+      const { id, ...saleData } = optSale;
       await addDoc(collection(db, 'sales'), saleData);
 
       for (const saleItem of newSale.items) {
         const product = products.find(p => p.id === saleItem.productId);
-        if (product) {
+        if (product && !(product.id.startsWith('local_') || product.id.startsWith('prod-'))) {
           const newQty = Math.max(0, product.quantity - saleItem.quantity);
           await updateDoc(doc(db, 'products', product.id), { quantity: newQty });
         }
       }
     } catch (error) {
-      console.warn("Firestore SALE failed, bypassing to local.");
-      const newS = { ...newSale, id: `local_sale_${Date.now()}` };
-      const updatedSales = [newS, ...sales];
-      setSales(updatedSales);
-      localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
-
-      const updatedProducts = products.map(p => {
-        const item = newSale.items.find(i => i.productId === p.id);
-        if (item) return { ...p, quantity: Math.max(0, p.quantity - item.quantity) };
-        return p;
-      });
-      setProducts(updatedProducts);
-      localStorage.setItem('elite_beauty_products', JSON.stringify(updatedProducts));
+      console.warn("Firestore SALE failed, cached locally:", error);
     }
   };
 
   const handleSettleDebt = async (customerName: string, settleAmount: number) => {
+    // Optimistically update locally
+    let remainingPaymentLocally = settleAmount;
+    const updatedSalesLocally = sales.map(s => {
+       if (s.customerName === customerName && s.balanceDue > 0 && remainingPaymentLocally > 0) {
+          const toPay = Math.min(remainingPaymentLocally, s.balanceDue);
+          remainingPaymentLocally -= toPay;
+          return {
+            ...s,
+            paidAmount: s.paidAmount + toPay,
+            balanceDue: s.balanceDue - toPay
+          };
+       }
+       return s;
+    });
+    setSales(updatedSalesLocally);
+    localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSalesLocally));
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
+      if (!isFirebaseAvailable) return;
       let remainingPayment = settleAmount;
       const relevantSales = sales.filter(s => s.customerName === customerName && s.balanceDue > 0)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -370,67 +590,76 @@ export default function App() {
         if (remainingPayment <= 0) break;
         const debt = sale.balanceDue;
         const toPay = Math.min(remainingPayment, debt);
-        await updateDoc(doc(db, 'sales', sale.id), {
-          paidAmount: sale.paidAmount + toPay,
-          balanceDue: sale.balanceDue - toPay
-        });
+        // Only run online update if it's a synced online sale
+        if (!(sale.id.startsWith('local_') || sale.id.startsWith('sale-'))) {
+          await updateDoc(doc(db, 'sales', sale.id), {
+            paidAmount: sale.paidAmount + toPay,
+            balanceDue: sale.balanceDue - toPay
+          });
+        }
         remainingPayment -= toPay;
       }
     } catch (error) {
-      console.warn("Firestore DEBT failed, bypassing to local.");
-      let remainingPayment = settleAmount;
-      const updatedSales = sales.map(s => {
-         if (s.customerName === customerName && s.balanceDue > 0 && remainingPayment > 0) {
-            const toPay = Math.min(remainingPayment, s.balanceDue);
-            remainingPayment -= toPay;
-            return {
-              ...s,
-              paidAmount: s.paidAmount + toPay,
-              balanceDue: s.balanceDue - toPay
-            };
-         }
-         return s;
-      });
-      setSales(updatedSales);
-      localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
+      console.warn("Firestore DEBT update failed, cached locally:", error);
     }
   };
 
   const handleAddCustomer = async (newCustomer: Customer) => {
+    const optimisticId = newCustomer.id.startsWith('local_') || newCustomer.id.startsWith('cust_')
+      ? newCustomer.id
+      : `local_cust_${Date.now()}`;
+    const optCust = { ...newCustomer, id: optimisticId };
+
+    const updated = [...customers, optCust];
+    setCustomers(updated);
+    localStorage.setItem('elite_beauty_customers', JSON.stringify(updated));
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      const { id, ...data } = newCustomer;
+      if (!isFirebaseAvailable) return;
+      const { id, ...data } = optCust;
       await addDoc(collection(db, 'customers'), data);
     } catch (error) {
-      console.warn("Firestore CUSTOMER failed, bypassing to local.");
-      const updated = [...customers, { ...newCustomer, id: `local_cust_${Date.now()}` }];
-      setCustomers(updated);
-      localStorage.setItem('elite_beauty_customers', JSON.stringify(updated));
+      console.warn("Firestore CUSTOMER failed, cached locally:", error);
     }
   };
 
   const handleAddExpense = async (newExpense: Expense) => {
+    const optimisticId = newExpense.id.startsWith('local_') || newExpense.id.startsWith('exp_')
+      ? newExpense.id
+      : `local_exp_${Date.now()}`;
+    const optExp = { ...newExpense, id: optimisticId };
+
+    const updated = [...expenses, optExp];
+    setExpenses(updated);
+    localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+
     try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      const { id, ...data } = newExpense;
+      if (!isFirebaseAvailable) return;
+      const { id, ...data } = optExp;
       await addDoc(collection(db, 'expenses'), data);
     } catch (error) {
-      console.warn("Firestore EXPENSE failed, bypassing to local.");
-      const updated = [...expenses, { ...newExpense, id: `local_exp_${Date.now()}` }];
-      setExpenses(updated);
-      localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+      console.warn("Firestore EXPENSE failed, cached locally:", error);
     }
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    try {
-      if (!isFirebaseAvailable) throw new Error("Firebase unavailable");
-      await deleteDoc(doc(db, 'expenses', expenseId));
-    } catch (error) {
-      console.warn("Firestore DELETE EXPENSE failed, bypassing to local.");
+    // If it's a local offline item, or if Firebase is unavailable, delete it locally right away
+    if (expenseId.startsWith('local_') || expenseId.startsWith('exp_') || !isFirebaseAvailable) {
       const updated = expenses.filter(e => e.id !== expenseId);
       setExpenses(updated);
       localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+      return;
+    }
+
+    try {
+      // Remove locally first for immediate responsiveness
+      const updated = expenses.filter(e => e.id !== expenseId);
+      setExpenses(updated);
+      localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+
+      await deleteDoc(doc(db, 'expenses', expenseId));
+    } catch (error) {
+      console.warn("Firestore DELETE EXPENSE failed, bypassed to local:", error);
     }
   };
 
@@ -572,7 +801,7 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 leading-normal">
           {activeTab === 'dashboard' && (
             <DashboardOverview 
-              products={products}
+              products={enrichedProducts}
               sales={sales}
               expenses={expenses}
               onNavigateToTab={(tab) => {
@@ -585,7 +814,7 @@ export default function App() {
 
           {activeTab === 'pos' && (
             <PosRegister 
-              products={products}
+              products={enrichedProducts}
               customers={customers}
               onRecordSale={handleRecordSale}
               existingSalesCount={sales.length}
@@ -594,7 +823,7 @@ export default function App() {
 
           {activeTab === 'stock' && (
             <ProductCatalog 
-              products={products}
+              products={enrichedProducts}
               sales={sales}
               onRecordSale={handleRecordSale}
               onAddProduct={handleAddProduct}
@@ -623,7 +852,7 @@ export default function App() {
 
           {activeTab === 'analytics' && (
             <AnalyticsPanel 
-              products={products}
+              products={enrichedProducts}
               sales={sales}
               expenses={expenses}
             />
@@ -631,7 +860,7 @@ export default function App() {
 
           {activeTab === 'alerts' && (
             <EmailAlertsSettings 
-              products={products}
+              products={enrichedProducts}
             />
           )}
         </main>
