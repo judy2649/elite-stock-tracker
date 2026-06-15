@@ -135,120 +135,131 @@ export default function App() {
   }, [user]);
 
   // Auto-seed missing products added by sonyaesther8@gmail.com if not already present on Firestore
-  useEffect(() => {
-    if (!user) return;
-    if (!isFirebaseAvailable) return;
-
-    const seedMissingProducts = async () => {
-      const missingProducts = [
-        {
-          id: 'prod-ski-261',
-          name: 'Glutathione Facial Cleanser',
-          category: 'Skin Care',
-          sku: 'EB-SKI-261',
-          costPrice: 25000,
-          sellingPrice: 35000,
-          quantity: 0,
-          safeLevel: 5,
-          expiryDate: '2028-06-30',
-          imageUrl: 'glutathione_cleanser',
-          description: 'Deeply cleanses, brightens, and refreshes skin. Formulated with high-quality Glutathione and Vitamin C.',
-          batchNumber: 'B26-2610',
-          locationStocks: {
-            kampala: 0,
-            wandegeya: 0,
-            entebbe: 0,
-          }
-        },
-        {
-          id: 'prod-ski-683',
-          name: 'Organic Body Scrub',
-          category: 'Skin Care',
-          sku: 'EB-SKI-683',
-          costPrice: 15000,
-          sellingPrice: 25000,
-          quantity: 12,
-          safeLevel: 5,
-          expiryDate: '2028-03-15',
-          imageUrl: 'skincare_scrub',
-          description: 'Exfoliating and skin smoothing natural body scrub infused with botanical extracts.',
-          batchNumber: 'B26-6589',
-          locationStocks: {
-            kampala: 12,
-            wandegeya: 0,
-            entebbe: 0,
-          }
-        },
-        {
-          id: 'prod-ski-191',
-          name: 'Blemishcare Showergel /body wash',
-          category: 'Skin Care',
-          sku: 'EB-SKI-191',
-          costPrice: 40000,
-          sellingPrice: 55000,
-          quantity: 0,
-          safeLevel: 3,
-          expiryDate: '2027-12-01',
-          imageUrl: 'blemishcare_showergel',
-          description: 'Acne and spot clearing blemishcare shower gel body wash, ideal for glowing skin.',
-          batchNumber: 'B26-6258',
-          locationStocks: {
-            kampala: 0,
-            wandegeya: 0,
-            entebbe: 0,
-          }
-        },
-        {
-          id: 'prod-ski-832',
-          name: 'Sk duches showergel',
-          category: 'Skin Care',
-          sku: 'EB-SKI-832',
-          costPrice: 35000,
-          sellingPrice: 48000,
-          quantity: 0,
-          safeLevel: 3,
-          expiryDate: '2028-01-20',
-          imageUrl: 'skduches_showergel',
-          description: 'Luxurious gold royal shower gel with long-lasting enchanting scent.',
-          batchNumber: 'B26-5685',
-          locationStocks: {
-            kampala: 0,
-            wandegeya: 0,
-            entebbe: 0,
-          }
-        },
-        {
-          id: 'prod-ski-545',
-          name: 'PauDeLune showergel',
-          category: 'Skin Care',
-          sku: 'EB-SKI-545',
-          costPrice: 38000,
-          sellingPrice: 52000,
-          quantity: 0,
-          safeLevel: 3,
-          expiryDate: '2027-09-10',
-          imageUrl: 'paudelune_showergel',
-          description: 'Premium French spa aromatherapy body wash for intense skin hydration.',
-          batchNumber: 'B26-3742',
-          locationStocks: {
-            kampala: 0,
-            wandegeya: 0,
-            entebbe: 0,
-          }
+  const seedMissingProducts = async () => {
+    const missingProducts = [
+      {
+        id: 'prod-ski-261',
+        name: 'Glutathione Facial Cleanser',
+        category: 'Skin Care',
+        sku: 'EB-SKI-261',
+        costPrice: 25000,
+        sellingPrice: 35000,
+        quantity: 0,
+        safeLevel: 5,
+        expiryDate: '2028-06-30',
+        imageUrl: 'glutathione_cleanser',
+        description: 'Deeply cleanses, brightens, and refreshes skin. Formulated with high-quality Glutathione and Vitamin C.',
+        batchNumber: 'B26-2610',
+        locationStocks: {
+          kampala: 0,
+          wandegeya: 0,
+          entebbe: 0,
         }
-      ];
+      },
+      {
+        id: 'prod-ski-683',
+        name: 'Organic Body Scrub',
+        category: 'Skin Care',
+        sku: 'EB-SKI-683',
+        costPrice: 15000,
+        sellingPrice: 25000,
+        quantity: 12,
+        safeLevel: 5,
+        expiryDate: '2028-03-15',
+        imageUrl: 'skincare_scrub',
+        description: 'Exfoliating and skin smoothing natural body scrub infused with botanical extracts.',
+        batchNumber: 'B26-6589',
+        locationStocks: {
+          kampala: 12,
+          wandegeya: 0,
+          entebbe: 0,
+        }
+      },
+      {
+        id: 'prod-ski-191',
+        name: 'Blemishcare Showergel /body wash',
+        category: 'Skin Care',
+        sku: 'EB-SKI-191',
+        costPrice: 40000,
+        sellingPrice: 55000,
+        quantity: 0,
+        safeLevel: 3,
+        expiryDate: '2027-12-01',
+        imageUrl: 'blemishcare_showergel',
+        description: 'Acne and spot clearing blemishcare shower gel body wash, ideal for glowing skin.',
+        batchNumber: 'B26-6258',
+        locationStocks: {
+          kampala: 0,
+          wandegeya: 0,
+          entebbe: 0,
+        }
+      },
+      {
+        id: 'prod-ski-832',
+        name: 'Sk duches showergel',
+        category: 'Skin Care',
+        sku: 'EB-SKI-832',
+        costPrice: 35000,
+        sellingPrice: 48000,
+        quantity: 0,
+        safeLevel: 3,
+        expiryDate: '2028-01-20',
+        imageUrl: 'skduches_showergel',
+        description: 'Luxurious gold royal shower gel with long-lasting enchanting scent.',
+        batchNumber: 'B26-5685',
+        locationStocks: {
+          kampala: 0,
+          wandegeya: 0,
+          entebbe: 0,
+        }
+      },
+      {
+        id: 'prod-ski-545',
+        name: 'PauDeLune showergel',
+        category: 'Skin Care',
+        sku: 'EB-SKI-545',
+        costPrice: 38000,
+        sellingPrice: 52000,
+        quantity: 0,
+        safeLevel: 3,
+        expiryDate: '2027-09-10',
+        imageUrl: 'paudelune_showergel',
+        description: 'Premium French spa aromatherapy body wash for intense skin hydration.',
+        batchNumber: 'B26-3742',
+        locationStocks: {
+          kampala: 0,
+          wandegeya: 0,
+          entebbe: 0,
+        }
+      }
+    ];
 
+    // 1. Force sync to Local State & Storage first for absolute guarantee and instant view
+    setProducts(prev => {
+      const filteredPrev = prev.filter(p => !missingProducts.some(m => m.sku === p.sku));
+      const merged = [...filteredPrev, ...missingProducts];
+      localStorage.setItem('elite_beauty_products', JSON.stringify(merged));
+      return merged;
+    });
+
+    // 2. Synchronize to Firestore if online
+    if (isFirebaseAvailable && db) {
       try {
+        console.log("Seeding Sonya's skincare products to Firestore...");
         for (const prod of missingProducts) {
           const { id, ...data } = prod;
           await setDoc(doc(db, 'products', id), data, { merge: true });
         }
-        console.log("Successfully seeded/synced Sonya's missing products.");
+        console.log("Successfully seeded/synced Sonya's missing products to Firestore.");
       } catch (err) {
-        console.warn("Seeding Sonya's missing products failed:", err);
+        console.warn("Seeding Sonya's missing products to Firestore failed:", err);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
+    if (!user) return;
+    // Auto-seed on login to guarantee default setup
     seedMissingProducts();
   }, [user]);
 
@@ -830,6 +841,7 @@ export default function App() {
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
               initialFilterClass={productFilterClass}
+              onForceSeed={seedMissingProducts}
             />
           )}
 
