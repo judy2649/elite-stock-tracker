@@ -72,7 +72,8 @@ const ADMIN_EMAILS = [
   'admin@elitebeauty.com',
   'manager@elitebeauty.com',
   'sonya@elitebeauty.com',
-  'judith@elitebeauty.com'
+  'judith@elitebeauty.com',
+  'System Admin'
 ].map(e => e.toLowerCase());
 
 export default function App() {
@@ -186,7 +187,7 @@ export default function App() {
 
   // Auto-seed missing products added by sonyaesther8@gmail.com if not already present on Firestore
   const seedMissingProducts = async () => {
-    const missingProducts = [
+    const missingProducts: Product[] = [
       {
         id: 'prod-ski-261',
         name: 'Glutathione Facial Cleanser',
@@ -248,11 +249,8 @@ export default function App() {
         imageUrl: 'skduches_showergel',
         description: 'Luxurious gold royal shower gel with long-lasting enchanting scent.',
         batchNumber: 'B26-5685',
-        locationStocks: {
-          kampala: 0,
-          wandegeya: 0,
-          entebbe: 0,
-        }
+        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
+        createdBy: 'system@elitebeauty.com'
       },
       {
         id: 'prod-ski-545',
@@ -267,17 +265,25 @@ export default function App() {
         imageUrl: 'paudelune_showergel',
         description: 'Premium French spa aromatherapy body wash for intense skin hydration.',
         batchNumber: 'B26-3742',
-        locationStocks: {
-          kampala: 0,
-          wandegeya: 0,
-          entebbe: 0,
-        }
+        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
+        createdBy: 'system@elitebeauty.com'
       }
     ];
 
     // 1. Force sync to Local State & Storage first for absolute guarantee and instant view
     const deletedJson = localStorage.getItem('elite_beauty_deleted_products');
-    const delIds: string[] = deletedJson ? JSON.parse(deletedJson) : [];
+    let delIds: string[] = deletedJson ? JSON.parse(deletedJson) : [];
+    
+    // Explicitly restore Sonya's products if they were accidentally deleted
+    const sonyaIds = missingProducts.map(p => p.id);
+    const originalDelLen = delIds.length;
+    delIds = delIds.filter(id => !sonyaIds.includes(id));
+    
+    if (delIds.length !== originalDelLen) {
+      localStorage.setItem('elite_beauty_deleted_products', JSON.stringify(delIds));
+      setDeletedProductIds(delIds);
+    }
+
     const missingFiltered = missingProducts.filter(p => !delIds.includes(p.id));
 
     setProducts(prev => {
@@ -453,9 +459,10 @@ export default function App() {
         .map(d => ({ ...d.data(), id: d.id } as Product))
         .filter(p => !delIds.includes(p.id))
         .filter(p => {
-          // STRICT FILTER: Only show items explicitly tagged by an official admin
-          if (!p.createdBy) return true; // Legacy items on cloud are trusted
-          return ADMIN_EMAILS.includes(p.createdBy.toLowerCase()) || p.createdBy === 'system@elitebeauty.com';
+          // Trusted sources: Official Admins, System tags, or Legacy items (no tag)
+          if (!p.createdBy) return true;
+          const creator = p.createdBy.toLowerCase();
+          return ADMIN_EMAILS.includes(creator) || creator === 'system@elitebeauty.com' || creator === 'system admin';
         });
       
       setProducts(prev => {
