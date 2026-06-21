@@ -73,50 +73,87 @@ export default function App() {
   const user = firebaseUser || localUser;
   const isOnlineSyncEnabled = isFirebaseAvailable && !!firebaseUser;
 
-  // Auto-migrate local data to Firestore once connection is open
+  // Auto-sync local data to Cloud once connection is open
   useEffect(() => {
-    if (!user) return;
-    if (!isOnlineSyncEnabled) return;
+    if (!user || !isOnlineSyncEnabled) return;
 
-    const migrateLocals = async (key: string, collectionName: string) => {
+    const syncPendingChanges = async (key: string, collectionName: string) => {
       const stored = localStorage.getItem(`elite_beauty_${key}`);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          const locals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
-          if (locals.length > 0) {
-            console.log(`Migrating ${locals.length} local ${key} to Firestore...`);
-            for (const item of locals) {
-              const { id, ...data } = item;
-              await addDoc(collection(db, collectionName), data);
-            }
-            
-            // Fetch fresh to avoid overwriting new data from snapshot
-            const freshStored = localStorage.getItem(`elite_beauty_${key}`);
-            const freshParsed = freshStored ? JSON.parse(freshStored) : [];
-            const clean = freshParsed.filter((item: any) => !String(item.id).startsWith('local_'));
-            localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(clean));
+      if (!stored) return;
 
-            // Clean from state so they don't linger
-            if (key === 'products') setProducts(prev => prev.filter(p => !String(p.id).startsWith('local_')));
-            if (key === 'sales') setSales(prev => prev.filter(p => !String(p.id).startsWith('local_')));
-            if (key === 'expenses') setExpenses(prev => prev.filter(p => !String(p.id).startsWith('local_')));
-            if (key === 'customers') setCustomers(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+      try {
+        const parsed = JSON.parse(stored);
+        
+        // 1. Sync NEW items (Additions)
+        const locals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
+        if (locals.length > 0) {
+          console.log(`Sync System: Uploading ${locals.length} local ${key}...`);
+          for (const item of locals) {
+            const { id, ...data } = item;
+            const newDocRef = await addDoc(collection(db, collectionName), data);
+            
+            // Special case: If we synced a sale, we MUST update inventory on Firestore too
+            if (key === 'sales') {
+              const sale = item as Sale;
+              for (const saleItem of sale.items) {
+                // Find matching product in current state
+                const targetProd = products.find(p => p.id === saleItem.productId);
+                if (targetProd) {
+                  // We don't use absolute quantity here because cloud might have changed.
+                  // But for migration, we'll try to reach a consistent state.
+                  await setDoc(doc(db, 'products', targetProd.id), { 
+                    quantity: targetProd.quantity 
+                  }, { merge: true });
+                }
+              }
+            }
           }
-        } catch (e) {
-          console.error(`Migration error for ${key}:`, e);
         }
+
+        // 2. Sync DELETIONS (Surgical)
+        if (key === 'products') {
+          const delStored = localStorage.getItem('elite_beauty_deleted_products');
+          const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+          if (delIds.length > 0) {
+            console.log(`Sync System: Finalizing ${delIds.length} deletions...`);
+            for (const id of delIds) {
+              if (!id.startsWith('local_')) {
+                try {
+                  await deleteDoc(doc(db, 'products', id));
+                } catch (e) {}
+              }
+            }
+            // Clear local deletion cache once synced to cloud
+            localStorage.setItem('elite_beauty_deleted_products', JSON.stringify([]));
+            setDeletedProductIds([]);
+          }
+        }
+
+        // Clean local state and storage of processed items
+        if (locals.length > 0) {
+          const freshStored = localStorage.getItem(`elite_beauty_${key}`);
+          const freshParsed = freshStored ? JSON.parse(freshStored) : [];
+          const clean = freshParsed.filter((item: any) => !String(item.id).startsWith('local_'));
+          localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(clean));
+
+          if (key === 'products') setProducts(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+          if (key === 'sales') setSales(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+          if (key === 'expenses') setExpenses(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+          if (key === 'customers') setCustomers(prev => prev.filter(p => !String(p.id).startsWith('local_')));
+        }
+      } catch (e) {
+        console.error(`Cloud Sync logic error for ${key}:`, e);
       }
     };
 
-    const runMigrations = async () => {
-      await migrateLocals('products', 'products');
-      await migrateLocals('sales', 'sales');
-      await migrateLocals('expenses', 'expenses');
-      await migrateLocals('customers', 'customers');
+    const runSync = async () => {
+      await syncPendingChanges('products', 'products');
+      await syncPendingChanges('sales', 'sales');
+      await syncPendingChanges('expenses', 'expenses');
+      await syncPendingChanges('customers', 'customers');
     };
-    runMigrations();
-  }, [user]);
+    runSync();
+  }, [user, isOnlineSyncEnabled]);
 
   // Enforce Admin Roles on login just to guarantee older documents get upgraded
   useEffect(() => {

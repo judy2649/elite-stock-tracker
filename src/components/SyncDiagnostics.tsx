@@ -121,12 +121,12 @@ export default function SyncDiagnostics({
                       <ConnectionIcon className="w-3.5 h-3.5" />
                       <span>{statusLabel}</span>
                     </div>
-                    {!isOnlineSyncEnabled && isFirebaseAvailable && (
+                    {isFirebaseAvailable && (
                       <button 
                         onClick={handleForceCloudLogin}
-                        className="text-[9px] text-gold-500 underline uppercase tracking-widest font-bold"
+                        className="text-[9px] text-gold-500 underline underline-offset-2 uppercase tracking-widest font-black"
                       >
-                        Attempt Re-Connect
+                        {isOnlineSyncEnabled ? 'Force Cloud Refresh' : 'Initiate Fast-Sync'}
                       </button>
                     )}
                   </div>
