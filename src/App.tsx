@@ -392,7 +392,16 @@ export default function App() {
           if (key === 'products') {
             const delStored = localStorage.getItem('elite_beauty_deleted_products');
             const delIds: string[] = delStored ? JSON.parse(delStored) : [];
-            parsed = parsed.filter((item: any) => !delIds.includes(item.id));
+            parsed = parsed.filter((item: any) => {
+              const notDeleted = !delIds.includes(item.id);
+              if (!notDeleted) return false;
+              // If we have a creator tag, it MUST be an admin or system
+              if (item.createdBy) {
+                const creator = item.createdBy.toLowerCase();
+                return ADMIN_EMAILS.includes(creator) || creator === 'system@elitebeauty.com' || creator === 'system admin';
+              }
+              return true; // Legacy items are trusted
+            });
           }
           setter(parsed);
         } catch (e) {}
@@ -428,8 +437,12 @@ export default function App() {
         filteredLocals = currentLocals.filter(e => !data.some((d: any) => d.title === e.title && d.amount === e.amount && d.date === e.date));
       }
 
-      // Merge DB data with filtered local items
-      let merged = [...data, ...filteredLocals];
+      // Use strictly cloud data if available, but keep local logic for other collections if needed
+      let merged = data;
+      if (key !== 'products') {
+        merged = [...data, ...filteredLocals];
+      }
+      
       if (key === 'products') {
         const delStored = localStorage.getItem('elite_beauty_deleted_products');
         const delIds: string[] = delStored ? JSON.parse(delStored) : [];
@@ -465,17 +478,9 @@ export default function App() {
           return ADMIN_EMAILS.includes(creator) || creator === 'system@elitebeauty.com' || creator === 'system admin';
         });
       
-      setProducts(prev => {
-        const cloudIds = new Set(cloudData.map(p => p.id));
-        const localOnly = prev.filter(p => 
-          (p.id.startsWith('local_') || p.id.startsWith('prod-')) && 
-          !cloudIds.has(p.id) &&
-          !cloudData.some(cp => cp.sku === p.sku || cp.name.toLowerCase() === p.name.toLowerCase()) &&
-          // Only show local items if they are tagged with current user to maintain optimistic UI
-          (p.createdBy ? ADMIN_EMAILS.includes(p.createdBy.toLowerCase()) : true)
-        );
-
-        const final = [...cloudData, ...localOnly]
+      setProducts(() => {
+        // STRICT: Only show cloud data that passed the admin filter
+        const final = [...cloudData]
           .filter(p => !delIds.includes(p.id))
           .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -621,11 +626,9 @@ export default function App() {
       createdBy: user?.email || 'System Admin'
     };
 
-    // Update state and localStorage first for instant feedback and durability
-    const updated = [...products, optimisticProduct];
-    setProducts(updated);
-    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
-
+    // Update state only (optimistic) - will be reconciled by onSnapshot
+    setProducts(prev => [...prev, optimisticProduct]);
+    
     try {
       if (!isOnlineSyncEnabled) return;
       const { id, ...data } = optimisticProduct;
@@ -636,10 +639,8 @@ export default function App() {
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
-    // Optimistically update locally right away
-    const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
-    setProducts(updated);
-    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    // Update state only (optimistic) - will be reconciled by onSnapshot
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
 
     // If Firebase is unavailable, local state already handles it
     if (!isOnlineSyncEnabled) return;
