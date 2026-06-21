@@ -17,6 +17,7 @@ import {
 
 import { auth, db, handleFirestoreError, OperationType, isFirebaseAvailable } from './lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import SyncDiagnostics from './components/SyncDiagnostics';
 import { signOut } from 'firebase/auth';
 import { 
   collection, 
@@ -67,13 +68,15 @@ export default function App() {
   const [firebaseUser, loading] = useAuthState(auth);
   const [localUser, setLocalUser] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(true);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   const user = firebaseUser || localUser;
+  const isOnlineSyncEnabled = isFirebaseAvailable && !!firebaseUser;
 
   // Auto-migrate local data to Firestore once connection is open
   useEffect(() => {
     if (!user) return;
-    if (!isFirebaseAvailable) return;
+    if (!isOnlineSyncEnabled) return;
 
     const migrateLocals = async (key: string, collectionName: string) => {
       const stored = localStorage.getItem(`elite_beauty_${key}`);
@@ -121,7 +124,7 @@ export default function App() {
     const enforceRoles = async () => {
       const email = user.email.toLowerCase();
       const adminEmails = ['islamnakibinge@gmail.com', 'sonyaesther8@gmail.com', 'judithoyoo64@gmail.com'];
-      if (adminEmails.includes(email) && isFirebaseAvailable) {
+      if (adminEmails.includes(email) && isOnlineSyncEnabled) {
         try {
           await setDoc(doc(db, 'users', email), {
             role: 'Owner / Manager'
@@ -247,7 +250,7 @@ export default function App() {
     });
 
     // 2. Synchronize to Firestore if online
-    if (isFirebaseAvailable && db && missingFiltered.length > 0) {
+    if (isOnlineSyncEnabled && db && missingFiltered.length > 0) {
       try {
         console.log("Seeding Sonya's skincare products to Firestore...");
         for (const prod of missingFiltered) {
@@ -378,8 +381,8 @@ export default function App() {
     loadLocal('expenses', setExpenses);
     loadLocal('customers', setCustomers);
 
-    if (!isFirebaseAvailable) {
-      console.log("Firebase not available. Continuing in Local Storage mode.");
+    if (!isOnlineSyncEnabled) {
+      console.log("Running in local storage offline mode. Skipping Firestore sync subscription.");
       setIsSyncing(false);
       return;
     }
@@ -402,6 +405,7 @@ export default function App() {
         return [...data, ...locals];
       });
       saveLocal('products', data);
+      setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore products sync failed, using local.");
       loadLocal('products', setProducts);
@@ -417,6 +421,7 @@ export default function App() {
         return [...data, ...locals];
       });
       saveLocal('sales', data);
+      setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore sales sync failed, using local.");
       loadLocal('sales', setSales);
@@ -432,6 +437,7 @@ export default function App() {
         return [...data, ...locals];
       });
       saveLocal('expenses', data);
+      setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore expenses sync failed, using local.");
       loadLocal('expenses', setExpenses);
@@ -447,6 +453,7 @@ export default function App() {
         return [...data, ...locals];
       });
       saveLocal('customers', data);
+      setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore customers sync failed, using local.");
       loadLocal('customers', setCustomers);
@@ -522,7 +529,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
 
     try {
-      if (!isFirebaseAvailable) return;
+      if (!isOnlineSyncEnabled) return;
       const { id, ...data } = optimisticProduct;
       await setDoc(doc(db, 'products', id), data);
     } catch (error: any) {
@@ -537,7 +544,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
 
     // If Firebase is unavailable, local state already handles it
-    if (!isFirebaseAvailable) return;
+    if (!isOnlineSyncEnabled) return;
 
     try {
       const { id, ...data } = updatedProduct;
@@ -562,7 +569,7 @@ export default function App() {
     setProducts(updated);
     localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
 
-    if (!isFirebaseAvailable) {
+    if (!isOnlineSyncEnabled) {
       return;
     }
 
@@ -594,7 +601,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_products', JSON.stringify(updatedProducts));
 
     try {
-      if (!isFirebaseAvailable) return;
+      if (!isOnlineSyncEnabled) return;
       const { id, ...saleData } = optSale;
       await setDoc(doc(db, 'sales', id), saleData);
 
@@ -629,7 +636,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSalesLocally));
 
     try {
-      if (!isFirebaseAvailable) return;
+      if (!isOnlineSyncEnabled) return;
       let remainingPayment = settleAmount;
       const relevantSales = sales.filter(s => s.customerName === customerName && s.balanceDue > 0)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -639,7 +646,7 @@ export default function App() {
         const debt = sale.balanceDue;
         const toPay = Math.min(remainingPayment, debt);
         // Only run online update if firebase available
-        if (isFirebaseAvailable) {
+        if (isOnlineSyncEnabled) {
           await setDoc(doc(db, 'sales', sale.id), {
             paidAmount: sale.paidAmount + toPay,
             balanceDue: sale.balanceDue - toPay
@@ -663,7 +670,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_customers', JSON.stringify(updated));
 
     try {
-      if (!isFirebaseAvailable) return;
+      if (!isOnlineSyncEnabled) return;
       const { id, ...data } = optCust;
       await setDoc(doc(db, 'customers', id), data);
     } catch (error) {
@@ -682,7 +689,7 @@ export default function App() {
     localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
 
     try {
-      if (!isFirebaseAvailable) return;
+      if (!isOnlineSyncEnabled) return;
       const { id, ...data } = optExp;
       await setDoc(doc(db, 'expenses', id), data);
     } catch (error) {
@@ -692,7 +699,7 @@ export default function App() {
 
   const handleDeleteExpense = async (expenseId: string) => {
     // If Firebase is unavailable, delete it locally right away
-    if (!isFirebaseAvailable) {
+    if (!isOnlineSyncEnabled) {
       const updated = expenses.filter(e => e.id !== expenseId);
       setExpenses(updated);
       localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
@@ -987,6 +994,19 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* 5. DIAGNOSTIC SYNC PANEL */}
+      <SyncDiagnostics 
+        isFirebaseAvailable={isFirebaseAvailable}
+        isOnlineSyncEnabled={isOnlineSyncEnabled}
+        userEmail={user?.email || null}
+        lastSyncTime={lastSyncTime}
+        counts={{
+          products: products.length,
+          sales: sales.length,
+          customers: customers.length,
+          expenses: expenses.length
+        }}
+      />
     </div>
   );
 }
