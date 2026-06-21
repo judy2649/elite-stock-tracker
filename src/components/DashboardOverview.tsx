@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Product, Sale, Expense } from '../types';
 import { formatUGX, isOutOfStock, isLowStock, getExpiryStatus } from '../utils';
-import SupabaseTodos from './SupabaseTodos.tsx';
 
 interface DashboardOverviewProps {
   products: Product[];
@@ -384,10 +383,6 @@ export default function DashboardOverview({
             <p className="text-xs text-zinc-700 leading-relaxed mt-1">
               Store inventory currently manages <b>{totalProducts} listings</b>. Average operating profit margins represent robust cosmetic retail averages in Kampala.
             </p>
-          </div>
-
-          <div className="mt-6">
-            <SupabaseTodos />
           </div>
         </div>
 
