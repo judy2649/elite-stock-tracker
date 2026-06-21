@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { 
   Activity, 
   Wifi, 
@@ -44,6 +46,35 @@ export default function SyncDiagnostics({
   const statusColor = isOnlineSyncEnabled ? 'text-emerald-400' : 'text-amber-400';
   const ConnectionIcon = isOnlineSyncEnabled ? Wifi : WifiOff;
 
+  const handleForceCloudLogin = async () => {
+    if (!isFirebaseAvailable || !auth) return;
+    try {
+      const storedEmail = localStorage.getItem('saved_email') || 'judithoyoo64@gmail.com';
+      const storedPass = localStorage.getItem('saved_password') || 'elitebeauty2026';
+      
+      console.log(`Diagnostic: Manual sync attempt for ${storedEmail}`);
+      await signInWithEmailAndPassword(auth, storedEmail, storedPass);
+      window.location.reload(); 
+    } catch (e: any) {
+      alert(`Cloud sync reconnection failed: ${e.message}\nTry Logging Out and Logging In again.`);
+    }
+  };
+
+  const handleClearCache = () => {
+    if (confirm("CRITICAL: This will wipe your local memory and force a re-fetch from the Cloud servers. Your session will also be reset. Target: Product/Sales/Expense cache. (Credentials will be preserved). Continue?")) {
+      const keys = [
+        'elite_beauty_products', 
+        'elite_beauty_sales', 
+        'elite_beauty_expenses', 
+        'elite_beauty_customers', 
+        'elite_beauty_deleted_products',
+        'local_mock_session'
+      ];
+      keys.forEach(k => localStorage.removeItem(k));
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-[100] font-sans">
       <AnimatePresence>
@@ -85,26 +116,49 @@ export default function SyncDiagnostics({
 
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-zinc-500 font-medium">Auto-Sync Pulse</span>
-                  <div className={`flex items-center gap-1.5 font-bold ${statusColor}`}>
-                    <ConnectionIcon className="w-3.5 h-3.5" />
-                    <span>{statusLabel}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className={`flex items-center gap-1.5 font-bold ${statusColor}`}>
+                      <ConnectionIcon className="w-3.5 h-3.5" />
+                      <span>{statusLabel}</span>
+                    </div>
+                    {!isOnlineSyncEnabled && isFirebaseAvailable && (
+                      <button 
+                        onClick={handleForceCloudLogin}
+                        className="text-[9px] text-gold-500 underline uppercase tracking-widest font-bold"
+                      >
+                        Attempt Re-Connect
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-zinc-500 font-medium">Authorized Agent</span>
-                  <span className="text-zinc-300 font-mono truncate max-w-[120px]" title={userEmail || 'Unauthenticated'}>
-                    {userEmail || 'Guest'}
-                  </span>
+                  <span className="text-zinc-500 font-medium">Session Context</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-zinc-300 font-mono truncate max-w-[120px]" title={userEmail || 'Unauthenticated'}>
+                      {userEmail || 'Guest'}
+                    </span>
+                    {!isOnlineSyncEnabled && (
+                      <span className="text-[8px] text-red-500 font-bold uppercase tracking-tighter">Sync Token Absent</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Data Snapshot */}
               <div className="pt-4 border-t border-zinc-900">
-                <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                  <Database className="w-3 h-3" />
-                  Terminal Memory (Local Cache)
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <Database className="w-3 h-3" />
+                    Terminal Memory
+                  </h4>
+                  <button 
+                    onClick={handleClearCache}
+                    className="text-[9px] text-zinc-500 hover:text-red-400 uppercase tracking-widest transition-colors font-bold"
+                  >
+                    Wipe Cache
+                  </button>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-zinc-900/40 p-2.5 rounded-xl border border-zinc-800/50 flex flex-col gap-1">

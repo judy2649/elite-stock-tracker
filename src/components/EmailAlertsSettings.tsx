@@ -24,7 +24,8 @@ interface EmailAlertsSettingsProps {
 
 const DEFAULT_ADMIN_EMAILS = [
   'sonyaesther8@gmail.com',
-  'islamnakibinge@gmail.com'
+  'islamnakibinge@gmail.com',
+  'judithoyoo64@gmail.com'
 ];
 
 export default function EmailAlertsSettings({ products }: EmailAlertsSettingsProps) {
@@ -441,7 +442,7 @@ Kampala, Uganda`,
                 <span>Default Admin Routing Active</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                Elite cosmetics inventory updates will dispatch status triggers directly to <b>sonyaesther8@gmail.com</b> and <b>islamnakibinge@gmail.com</b> as provided. Check logs to preview the email structure.
+                Elite cosmetics inventory updates will dispatch status triggers directly to <b>sonyaesther8@gmail.com</b>, <b>islamnakibinge@gmail.com</b> and <b>judithoyoo64@gmail.com</b> as provided. Check logs to preview the email structure.
               </p>
             </div>
           </div>

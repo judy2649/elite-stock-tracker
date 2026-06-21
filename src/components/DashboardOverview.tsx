@@ -223,7 +223,7 @@ export default function DashboardOverview({
           <div className="mb-4 p-2.5 bg-royal-50/40 border border-royal-100/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-zinc-600">
             <span className="flex items-center gap-2 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-              <span>Dispatched alerts active to: <b className="text-zinc-800 font-mono">sonyaesther8@gmail.com</b> and <b className="text-zinc-800 font-mono">islamnakibinge@gmail.com</b></span>
+              <span>Dispatched alerts active to: <b className="text-zinc-800 font-mono">sonyaesther8@gmail.com</b>, <b className="text-zinc-800 font-mono">islamnakibinge@gmail.com</b> and <b className="text-zinc-800 font-mono">judithoyoo64@gmail.com</b></span>
             </span>
             <button 
               onClick={() => onNavigateToTab('alerts')}

@@ -13,7 +13,12 @@ import eliteBeautyBadge from '../assets/images/elite_beauty_badge_1781372578945.
 const ADMIN_EMAILS = [
   'islamnakibinge@gmail.com',
   'sonyaesther8@gmail.com',
-  'judithoyoo64@gmail.com'
+  'judithoyoo64@gmail.com',
+  'nakibingei@gmail.com',
+  'admin@elitebeauty.com',
+  'manager@elitebeauty.com',
+  'sonya@elitebeauty.com',
+  'judith@elitebeauty.com'
 ].map(e => e.toLowerCase());
 
 const getRoleForEmail = (email: string | null | undefined): string => {
@@ -68,16 +73,32 @@ export default function Auth({ onAuthSuccess }: { onAuthSuccess: (user: any) => 
       // 2. Attempt Real Cloud Auth if available (The "Sync Engine")
       if (isFirebaseAvailable && auth) {
         try {
-          console.log("Attempting Cloud Sync login...");
+          console.log("Attempting Cloud Sync login for:", normalizedEmail);
+          // Try to sign in. If it fails, they might need an account or the password is wrong.
           await signInWithEmailAndPassword(auth, normalizedEmail, password);
+          console.log("Cloud Sync connection established.");
+          
+          // Store credentials for auto-reconnection in diagnostics
+          localStorage.setItem('saved_email', normalizedEmail);
+          localStorage.setItem('saved_password', password);
         } catch (authErr: any) {
           // If user doesn't exist, register them seamlessly to satisfy "no-stress" requirement
-          if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential') {
+          if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
             try {
-              console.log("New user detected, auto-provisioning Cloud Sync...");
+              console.log("Sync account issue, attempting automatic sync-provisioning...");
+              // We'll try to create the account if it doesn't exist. 
               await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+              console.log("Cloud Sync account provisioned.");
+              
+              localStorage.setItem('saved_email', normalizedEmail);
+              localStorage.setItem('saved_password', password);
             } catch (regErr: any) {
-              console.warn("Cloud registration bypassed:", regErr.message);
+              if (regErr.code === 'auth/email-already-in-use') {
+                 console.warn("Cloud account exists but password mismatch. Sync will be restricted.");
+                 // Still allow local login, but sync will be off.
+              } else {
+                 console.warn("Cloud registration failed:", regErr.message);
+              }
             }
           } else {
             console.warn("Cloud sync authentication failed, using local fallback:", authErr.message);

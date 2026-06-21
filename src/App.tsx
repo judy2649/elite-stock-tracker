@@ -18,7 +18,7 @@ import {
 import { auth, db, handleFirestoreError, OperationType, isFirebaseAvailable } from './lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import SyncDiagnostics from './components/SyncDiagnostics';
-import { signOut } from 'firebase/auth';
+import { signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { 
   collection, 
   onSnapshot, 
@@ -123,7 +123,16 @@ export default function App() {
     if (!user || (!user.email)) return;
     const enforceRoles = async () => {
       const email = user.email.toLowerCase();
-      const adminEmails = ['islamnakibinge@gmail.com', 'sonyaesther8@gmail.com', 'judithoyoo64@gmail.com'];
+      const adminEmails = [
+        'islamnakibinge@gmail.com', 
+        'sonyaesther8@gmail.com', 
+        'judithoyoo64@gmail.com',
+        'nakibingei@gmail.com',
+        'admin@elitebeauty.com',
+        'manager@elitebeauty.com',
+        'sonya@elitebeauty.com',
+        'judith@elitebeauty.com'
+      ].map(e => e.toLowerCase());
       if (adminEmails.includes(email) && isOnlineSyncEnabled) {
         try {
           await setDoc(doc(db, 'users', email), {
@@ -270,6 +279,26 @@ export default function App() {
     seedMissingProducts();
   }, [user]);
 
+  // Background Auto-Reconnect for Admins (The "Always-On Sync" Assurance)
+  useEffect(() => {
+    if (!isFirebaseAvailable || !auth || firebaseUser || !user) return;
+    
+    const attemptBgReconnect = async () => {
+      const storedEmail = localStorage.getItem('saved_email');
+      const storedPass = localStorage.getItem('saved_password');
+      if (storedEmail && storedPass) {
+        try {
+          console.log("Elite System: Maintaining admin sync context...");
+          await signInWithEmailAndPassword(auth, storedEmail, storedPass);
+        } catch (e) {
+          console.warn("Background sync restoration failed.");
+        }
+      }
+    };
+
+    attemptBgReconnect();
+  }, [firebaseUser, user, isFirebaseAvailable]);
+
   // Initialize Auth State (Fallback to Local Mock if Firebase absent)
   useEffect(() => {
     if (!loading) {
@@ -391,20 +420,25 @@ export default function App() {
       const delStored = localStorage.getItem('elite_beauty_deleted_products');
       const delIds: string[] = delStored ? JSON.parse(delStored) : [];
 
-      const data = snapshot.docs
+      const cloudData = snapshot.docs
         .map(d => ({ ...d.data(), id: d.id } as Product))
         .filter(p => !delIds.includes(p.id));
       
-      // Set state: Merge DB data with any local items safely and deduplicate
       setProducts(prev => {
-        const locals = prev.filter(p => 
-          !delIds.includes(p.id) &&
-          (p.id.startsWith('local_') || p.id.startsWith('prod-')) &&
-          !data.some(d => d.sku === p.sku || d.name.toLowerCase() === p.name.toLowerCase())
+        const cloudIds = new Set(cloudData.map(p => p.id));
+        const localOnly = prev.filter(p => 
+          (p.id.startsWith('local_') || p.id.startsWith('prod-')) && 
+          !cloudIds.has(p.id) &&
+          !cloudData.some(cp => cp.sku === p.sku || cp.name.toLowerCase() === p.name.toLowerCase())
         );
-        return [...data, ...locals];
+
+        const final = [...cloudData, ...localOnly]
+          .filter(p => !delIds.includes(p.id))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        saveLocal('products', final);
+        return final;
       });
-      saveLocal('products', data);
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore products sync failed, using local.");
@@ -412,15 +446,15 @@ export default function App() {
     });
 
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
       setSales(prev => {
-        const locals = prev.filter(s => 
-          (s.id.startsWith('local_') || s.id.startsWith('sale-')) &&
-          !data.some(d => d.invoiceNumber === s.invoiceNumber)
-        );
-        return [...data, ...locals];
+        const mergedMap = new Map<string, Sale>();
+        prev.forEach(s => mergedMap.set(s.id, s));
+        cloudData.forEach(s => mergedMap.set(s.id, s));
+        const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        saveLocal('sales', final);
+        return final;
       });
-      saveLocal('sales', data);
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore sales sync failed, using local.");
@@ -428,15 +462,15 @@ export default function App() {
     });
 
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
       setExpenses(prev => {
-        const locals = prev.filter(e => 
-          (e.id.startsWith('local_') || e.id.startsWith('exp_')) &&
-          !data.some(d => d.title === e.title && d.amount === e.amount && d.date === e.date)
-        );
-        return [...data, ...locals];
+        const mergedMap = new Map<string, Expense>();
+        prev.forEach(e => mergedMap.set(e.id, e));
+        cloudData.forEach(e => mergedMap.set(e.id, e));
+        const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        saveLocal('expenses', final);
+        return final;
       });
-      saveLocal('expenses', data);
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore expenses sync failed, using local.");
@@ -444,15 +478,15 @@ export default function App() {
     });
 
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
       setCustomers(prev => {
-        const locals = prev.filter(c => 
-          (c.id.startsWith('local_') || c.id.startsWith('cust_')) &&
-          !data.some(d => d.name.toLowerCase() === c.name.toLowerCase() || (d.phone && d.phone === c.phone))
-        );
-        return [...data, ...locals];
+        const mergedMap = new Map<string, Customer>();
+        prev.forEach(c => mergedMap.set(c.id, c));
+        cloudData.forEach(c => mergedMap.set(c.id, c));
+        const final = Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        saveLocal('customers', final);
+        return final;
       });
-      saveLocal('customers', data);
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore customers sync failed, using local.");
@@ -498,7 +532,13 @@ export default function App() {
     // but we'll keep a client-side check for now as requested by typical flow.
     const enableLowStock = true;
     const enableOutOfStock = true;
-    const adminEmails = ['sonyaesther8@gmail.com', 'islamnakibinge@gmail.com'];
+    const adminEmails = [
+      'sonyaesther8@gmail.com', 
+      'islamnakibinge@gmail.com', 
+      'judithoyoo64@gmail.com',
+      'nakibingei@gmail.com',
+      'admin@elitebeauty.com'
+    ].map(e => e.toLowerCase());
 
     const newWarnings: string[] = [];
     currentProducts.forEach(curr => {
