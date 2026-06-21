@@ -11,6 +11,7 @@ export interface Product {
   imageUrl: string;        // placeholder or beauty shot
   description?: string;
   lastStockIn?: string;    // YYYY-MM-DD
+  createdBy?: string;      // Admin email who added this
   // NEW ADVANCED BEAUTY FIELDS
   batchNumber?: string;    // Batch & Lot management
   shadeVariants?: string[]; // Cosmetic shade variants

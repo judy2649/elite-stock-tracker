@@ -64,6 +64,17 @@ const IMAGE_MAPPING: Record<string, string> = {
   'paudelune_showergel': paudeluneShowergelImg,
 };
 
+const ADMIN_EMAILS = [
+  'islamnakibinge@gmail.com', 
+  'sonyaesther8@gmail.com', 
+  'judithoyoo64@gmail.com',
+  'nakibingei@gmail.com',
+  'admin@elitebeauty.com',
+  'manager@elitebeauty.com',
+  'sonya@elitebeauty.com',
+  'judith@elitebeauty.com'
+].map(e => e.toLowerCase());
+
 export default function App() {
   const [firebaseUser, loading] = useAuthState(auth);
   const [localUser, setLocalUser] = useState<any>(null);
@@ -160,18 +171,7 @@ export default function App() {
     if (!user || (!user.email)) return;
     const enforceRoles = async () => {
       const email = user.email.toLowerCase();
-      const adminEmails = [
-        'islamnakibinge@gmail.com', 
-        'sonyaesther8@gmail.com', 
-        'judithoyoo64@gmail.com',
-        'nakibingei@gmail.com',
-        'admin@elitebeauty.com',
-        'manager@elitebeauty.com',
-        'sonya@elitebeauty.com',
-        'judith@elitebeauty.com',
-        'islamnakibinge@gmail.com'
-      ].map(e => e.toLowerCase());
-      if (adminEmails.includes(email) && isOnlineSyncEnabled) {
+      if (ADMIN_EMAILS.includes(email) && isOnlineSyncEnabled) {
         try {
           await setDoc(doc(db, 'users', email), {
             role: 'Owner / Manager'
@@ -200,11 +200,8 @@ export default function App() {
         imageUrl: 'glutathione_cleanser',
         description: 'Deeply cleanses, brightens, and refreshes skin. Formulated with high-quality Glutathione and Vitamin C.',
         batchNumber: 'B26-2610',
-        locationStocks: {
-          kampala: 0,
-          wandegeya: 0,
-          entebbe: 0,
-        }
+        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
+        createdBy: 'system@elitebeauty.com'
       },
       {
         id: 'prod-ski-683',
@@ -219,11 +216,8 @@ export default function App() {
         imageUrl: 'skincare_scrub',
         description: 'Exfoliating and skin smoothing natural body scrub infused with botanical extracts.',
         batchNumber: 'B26-6589',
-        locationStocks: {
-          kampala: 12,
-          wandegeya: 0,
-          entebbe: 0,
-        }
+        locationStocks: { kampala: 12, wandegeya: 0, entebbe: 0 },
+        createdBy: 'system@elitebeauty.com'
       },
       {
         id: 'prod-ski-191',
@@ -238,11 +232,8 @@ export default function App() {
         imageUrl: 'blemishcare_showergel',
         description: 'Acne and spot clearing blemishcare shower gel body wash, ideal for glowing skin.',
         batchNumber: 'B26-6258',
-        locationStocks: {
-          kampala: 0,
-          wandegeya: 0,
-          entebbe: 0,
-        }
+        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
+        createdBy: 'system@elitebeauty.com'
       },
       {
         id: 'prod-ski-832',
@@ -460,14 +451,21 @@ export default function App() {
 
       const cloudData = snapshot.docs
         .map(d => ({ ...d.data(), id: d.id } as Product))
-        .filter(p => !delIds.includes(p.id));
+        .filter(p => !delIds.includes(p.id))
+        .filter(p => {
+          // STRICT FILTER: Only show items explicitly tagged by an official admin
+          if (!p.createdBy) return true; // Legacy items on cloud are trusted
+          return ADMIN_EMAILS.includes(p.createdBy.toLowerCase()) || p.createdBy === 'system@elitebeauty.com';
+        });
       
       setProducts(prev => {
         const cloudIds = new Set(cloudData.map(p => p.id));
         const localOnly = prev.filter(p => 
           (p.id.startsWith('local_') || p.id.startsWith('prod-')) && 
           !cloudIds.has(p.id) &&
-          !cloudData.some(cp => cp.sku === p.sku || cp.name.toLowerCase() === p.name.toLowerCase())
+          !cloudData.some(cp => cp.sku === p.sku || cp.name.toLowerCase() === p.name.toLowerCase()) &&
+          // Only show local items if they are tagged with current user to maintain optimistic UI
+          (p.createdBy ? ADMIN_EMAILS.includes(p.createdBy.toLowerCase()) : true)
         );
 
         const final = [...cloudData, ...localOnly]
@@ -610,7 +608,11 @@ export default function App() {
     const optimisticId = newProduct.id.startsWith('local_') || newProduct.id.startsWith('prod-')
       ? newProduct.id 
       : `local_prod_${Date.now()}`;
-    const optimisticProduct = { ...newProduct, id: optimisticId };
+    const optimisticProduct = { 
+      ...newProduct, 
+      id: optimisticId,
+      createdBy: user?.email || 'System Admin'
+    };
 
     // Update state and localStorage first for instant feedback and durability
     const updated = [...products, optimisticProduct];
