@@ -168,7 +168,8 @@ export default function App() {
         'admin@elitebeauty.com',
         'manager@elitebeauty.com',
         'sonya@elitebeauty.com',
-        'judith@elitebeauty.com'
+        'judith@elitebeauty.com',
+        'islamnakibinge@gmail.com'
       ].map(e => e.toLowerCase());
       if (adminEmails.includes(email) && isOnlineSyncEnabled) {
         try {
@@ -474,12 +475,14 @@ export default function App() {
           .sort((a, b) => a.name.localeCompare(b.name));
 
         saveLocal('products', final);
+        setIsSyncing(false);
         return final;
       });
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore products sync failed, using local.");
       loadLocal('products', setProducts);
+      setIsSyncing(false);
     });
 
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
@@ -490,12 +493,14 @@ export default function App() {
         cloudData.forEach(s => mergedMap.set(s.id, s));
         const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         saveLocal('sales', final);
+        setIsSyncing(false);
         return final;
       });
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore sales sync failed, using local.");
       loadLocal('sales', setSales);
+      setIsSyncing(false);
     });
 
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
@@ -506,12 +511,14 @@ export default function App() {
         cloudData.forEach(e => mergedMap.set(e.id, e));
         const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         saveLocal('expenses', final);
+        setIsSyncing(false);
         return final;
       });
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore expenses sync failed, using local.");
       loadLocal('expenses', setExpenses);
+      setIsSyncing(false);
     });
 
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
@@ -522,12 +529,14 @@ export default function App() {
         cloudData.forEach(c => mergedMap.set(c.id, c));
         const final = Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name));
         saveLocal('customers', final);
+        setIsSyncing(false);
         return final;
       });
       setLastSyncTime(new Date());
     }, (error) => {
       console.warn("Firestore customers sync failed, using local.");
       loadLocal('customers', setCustomers);
+      setIsSyncing(false);
     });
 
     return () => {
@@ -574,7 +583,10 @@ export default function App() {
       'islamnakibinge@gmail.com', 
       'judithoyoo64@gmail.com',
       'nakibingei@gmail.com',
-      'admin@elitebeauty.com'
+      'admin@elitebeauty.com',
+      'manager@elitebeauty.com',
+      'sonya@elitebeauty.com',
+      'judith@elitebeauty.com'
     ].map(e => e.toLowerCase());
 
     const newWarnings: string[] = [];

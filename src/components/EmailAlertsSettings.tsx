@@ -25,7 +25,12 @@ interface EmailAlertsSettingsProps {
 const DEFAULT_ADMIN_EMAILS = [
   'sonyaesther8@gmail.com',
   'islamnakibinge@gmail.com',
-  'judithoyoo64@gmail.com'
+  'judithoyoo64@gmail.com',
+  'nakibingei@gmail.com',
+  'admin@elitebeauty.com',
+  'manager@elitebeauty.com',
+  'sonya@elitebeauty.com',
+  'judith@elitebeauty.com'
 ];
 
 export default function EmailAlertsSettings({ products }: EmailAlertsSettingsProps) {
