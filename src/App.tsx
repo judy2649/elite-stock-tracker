@@ -69,6 +69,7 @@ const IMAGE_MAPPING: Record<string, string> = {
 const ADMIN_EMAILS = [
   'islamnakibinge@gmail.com', 
   'sonyaesther8@gmail.com', 
+  'sonyaesther8@gmaoil.com',
   'judithoyoo64@gmail.com',
   'nakibingei@gmail.com',
   'admin@elitebeauty.com',
@@ -472,18 +473,11 @@ export default function App() {
 
       const cloudData = snapshot.docs
         .map(d => ({ ...d.data(), id: d.id } as Product))
-        .filter(p => !delIds.includes(p.id))
-        .filter(p => {
-          // Trusted sources: Official Admins, System tags, or Legacy items (no tag)
-          if (!p.createdBy) return true;
-          const creator = p.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator) || creator === 'system@elitebeauty.com' || creator === 'system admin';
-        });
+        .filter(p => !delIds.includes(p.id));
       
       setProducts(() => {
-        // STRICT: Only show cloud data that passed the admin filter
+        // STRICT: Only show cloud data that passed the deletion filter
         const final = [...cloudData]
-          .filter(p => !delIds.includes(p.id))
           .sort((a, b) => a.name.localeCompare(b.name));
 
         saveLocal('products', final);

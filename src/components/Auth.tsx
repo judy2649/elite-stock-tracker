@@ -13,6 +13,7 @@ import eliteBeautyBadge from '../assets/images/elite_beauty_badge_1781372578945.
 const ADMIN_EMAILS = [
   'islamnakibinge@gmail.com',
   'sonyaesther8@gmail.com',
+  'sonyaesther8@gmaoil.com',
   'judithoyoo64@gmail.com',
   'nakibingei@gmail.com',
   'admin@elitebeauty.com',
