@@ -1,11 +1,13 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 let app: any;
 let db: any;
 let auth: any;
+let analytics: any;
 let googleProvider: any;
 let isFirebaseAvailable = false;
 
@@ -16,6 +18,14 @@ try {
     app = getApp();
   }
   
+  // Initialize Analytics if supported
+  isSupported().then(yes => {
+    if (yes) {
+      analytics = getAnalytics(app);
+      console.log("Firebase Analytics initialized.");
+    }
+  });
+
   const dbId = (!firebaseConfig.firestoreDatabaseId || firebaseConfig.firestoreDatabaseId === '(default)')
     ? undefined
     : firebaseConfig.firestoreDatabaseId;
@@ -61,7 +71,7 @@ try {
   isFirebaseAvailable = false;
 }
 
-export { app, db, auth, googleProvider, isFirebaseAvailable };
+export { app, db, auth, analytics, googleProvider, isFirebaseAvailable };
 
 export enum OperationType {
   CREATE = 'create',

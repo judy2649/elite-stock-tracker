@@ -1,0 +1,11 @@
+platform :ios, '14.0'
+
+target 'EliteBeauty' do
+  use_frameworks!
+
+  # Firebase Pods
+  pod 'Firebase/Analytics'
+  pod 'Firebase/Firestore'
+  pod 'Firebase/Auth'
+
+end
