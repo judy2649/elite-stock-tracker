@@ -89,6 +89,64 @@ export default function App() {
   const user = firebaseUser || localUser;
   const isOnlineSyncEnabled = isFirebaseAvailable && !!firebaseUser;
 
+  const loadLocal = (key: string, setter: any) => {
+    const stored = localStorage.getItem(`elite_beauty_${key}`);
+    if (stored) {
+      try {
+        let parsed = JSON.parse(stored);
+        if (key === 'products' || key === 'sales' || key === 'expenses' || key === 'customers') {
+          const delStored = localStorage.getItem('elite_beauty_deleted_products');
+          const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+
+          parsed = parsed.filter((item: any) => {
+            if (key === 'products' && delIds.includes(item.id)) return false;
+            return true;
+          });
+        }
+        setter(parsed);
+      } catch (e) {}
+    }
+  };
+
+  const saveLocal = (key: string, data: any) => {
+    const stored = localStorage.getItem(`elite_beauty_${key}`);
+    let currentLocals: any[] = [];
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        currentLocals = parsed.filter((item: any) => 
+          String(item.id).startsWith('local_') || 
+          String(item.id).startsWith('prod-') || 
+          String(item.id).startsWith('sale-') || 
+          String(item.id).startsWith('exp-') || 
+          String(item.id).startsWith('cust-')
+        );
+      } catch (e) {}
+    }
+    
+    let filteredLocals = currentLocals;
+    if (key === 'products') {
+      filteredLocals = currentLocals.filter(p => !data.some((d: any) => (d.sku && d.sku === p.sku) || (d.name && d.name.toLowerCase() === p.name.toLowerCase())));
+    } else if (key === 'sales') {
+      filteredLocals = currentLocals.filter(s => !data.some((d: any) => d.invoiceNumber === s.invoiceNumber));
+    } else if (key === 'customers') {
+      filteredLocals = currentLocals.filter(c => !data.some((d: any) => (d.name && d.name.toLowerCase() === c.name.toLowerCase()) || (d.phone && d.phone === c.phone)));
+    } else if (key === 'expenses') {
+      filteredLocals = currentLocals.filter(e => !data.some((d: any) => d.title === e.title && d.amount === e.amount && d.date === e.date));
+    }
+
+    const merged = [...data, ...filteredLocals];
+    
+    if (key === 'products') {
+      const delStored = localStorage.getItem('elite_beauty_deleted_products');
+      const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+      const finalProducts = merged.filter((item: any) => !delIds.includes(item.id));
+      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(finalProducts));
+    } else {
+      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(merged));
+    }
+  };
+
   // Auto-sync local data to Cloud once connection is open
   useEffect(() => {
     if (!user || !isOnlineSyncEnabled) return;
@@ -101,7 +159,13 @@ export default function App() {
         const parsed = JSON.parse(stored);
         
         // 1. Sync NEW items (Additions)
-        const locals = parsed.filter((item: any) => String(item.id).startsWith('local_'));
+        const locals = parsed.filter((item: any) => 
+          String(item.id).startsWith('local_') || 
+          String(item.id).startsWith('prod-') || 
+          String(item.id).startsWith('sale-') || 
+          String(item.id).startsWith('exp-') || 
+          String(item.id).startsWith('cust-')
+        );
         if (locals.length > 0) {
           console.log(`Sync System: Uploading ${locals.length} local ${key}...`);
           for (const item of locals) {
@@ -266,66 +330,6 @@ export default function App() {
   // Real-time Firestore Sync with Local Storage Fallback
   useEffect(() => {
     if (!user) return;
-
-    const loadLocal = (key: string, setter: any) => {
-      const stored = localStorage.getItem(`elite_beauty_${key}`);
-      if (stored) {
-        try {
-          let parsed = JSON.parse(stored);
-          if (key === 'products' || key === 'sales' || key === 'expenses' || key === 'customers') {
-            const delStored = localStorage.getItem('elite_beauty_deleted_products');
-            const delIds: string[] = delStored ? JSON.parse(delStored) : [];
-            const userEmail = (user?.email || '').toLowerCase();
-
-            parsed = parsed.filter((item: any) => {
-              if (key === 'products' && delIds.includes(item.id)) return false;
-              return true; // Show all items in local storage if not explicitly deleted
-            });
-          }
-          setter(parsed);
-        } catch (e) {}
-      }
-    };
-
-    const saveLocal = (key: string, data: any) => {
-      // Don't overwrite local unmigrated records when saving from firestore!
-      const stored = localStorage.getItem(`elite_beauty_${key}`);
-      let currentLocals: any[] = [];
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          currentLocals = parsed.filter((item: any) => 
-            String(item.id).startsWith('local_')
-          );
-        } catch (e) {}
-      }
-      
-      // Filter out any local items that have been merged/saved on firestore
-      let filteredLocals = currentLocals;
-      if (key === 'products') {
-        filteredLocals = currentLocals.filter(p => !data.some((d: any) => d.sku === p.sku || d.name.toLowerCase() === p.name.toLowerCase()));
-      } else if (key === 'sales') {
-        filteredLocals = currentLocals.filter(s => !data.some((d: any) => d.invoiceNumber === s.invoiceNumber));
-      } else if (key === 'customers') {
-        filteredLocals = currentLocals.filter(c => !data.some((d: any) => d.name.toLowerCase() === c.name.toLowerCase() || (d.phone && d.phone === c.phone)));
-      } else if (key === 'expenses') {
-        filteredLocals = currentLocals.filter(e => !data.some((d: any) => d.title === e.title && d.amount === e.amount && d.date === e.date));
-      }
-
-      // Use strictly cloud data if available, but keep local logic for other collections if needed
-      let merged = data;
-      if (key !== 'products') {
-        merged = [...data, ...filteredLocals];
-      }
-      
-      if (key === 'products') {
-        const delStored = localStorage.getItem('elite_beauty_deleted_products');
-        const delIds: string[] = delStored ? JSON.parse(delStored) : [];
-        merged = merged.filter((item: any) => !delIds.includes(item.id));
-      }
-      
-      localStorage.setItem(`elite_beauty_${key}`, JSON.stringify(merged));
-    };
 
     // Load initial from local for instant feedback
     loadLocal('products', setProducts);
@@ -508,8 +512,10 @@ export default function App() {
       createdBy: user?.email || 'System Admin'
     };
 
-    // Update state only (optimistic) - will be reconciled by onSnapshot
-    setProducts(prev => [...prev, optimisticProduct]);
+    // Update state and persistence immediately
+    const updated = [...products, optimisticProduct];
+    setProducts(updated);
+    saveLocal('products', updated);
     
     try {
       if (!isOnlineSyncEnabled) return;
@@ -521,8 +527,10 @@ export default function App() {
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
-    // Update state only (optimistic) - will be reconciled by onSnapshot
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    // Update state and persistence immediately
+    const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
+    setProducts(updated);
+    saveLocal('products', updated);
 
     // If Firebase is unavailable, local state already handles it
     if (!isOnlineSyncEnabled) return;
@@ -548,7 +556,7 @@ export default function App() {
     // Remove locally first for immediate responsiveness
     const updated = products.filter(p => p.id !== productId);
     setProducts(updated);
-    localStorage.setItem('elite_beauty_products', JSON.stringify(updated));
+    saveLocal('products', updated);
 
     if (!isOnlineSyncEnabled) {
       return;
@@ -575,7 +583,7 @@ export default function App() {
     // Update sales and products state & localStorage optimistically
     const updatedSales = [optSale, ...sales];
     setSales(updatedSales);
-    localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSales));
+    saveLocal('sales', updatedSales);
 
     const updatedProducts = products.map(p => {
       const item = newSale.items.find(i => i.productId === p.id);
@@ -583,7 +591,7 @@ export default function App() {
       return p;
     });
     setProducts(updatedProducts);
-    localStorage.setItem('elite_beauty_products', JSON.stringify(updatedProducts));
+    saveLocal('products', updatedProducts);
 
     try {
       if (!isOnlineSyncEnabled) return;
@@ -618,7 +626,7 @@ export default function App() {
        return s;
     });
     setSales(updatedSalesLocally);
-    localStorage.setItem('elite_beauty_sales', JSON.stringify(updatedSalesLocally));
+    saveLocal('sales', updatedSalesLocally);
 
     try {
       if (!isOnlineSyncEnabled) return;
@@ -656,7 +664,7 @@ export default function App() {
 
     const updated = [...customers, optCust];
     setCustomers(updated);
-    localStorage.setItem('elite_beauty_customers', JSON.stringify(updated));
+    saveLocal('customers', updated);
 
     try {
       if (!isOnlineSyncEnabled) return;
@@ -679,7 +687,7 @@ export default function App() {
 
     const updated = [...expenses, optExp];
     setExpenses(updated);
-    localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+    saveLocal('expenses', updated);
 
     try {
       if (!isOnlineSyncEnabled) return;
@@ -703,7 +711,7 @@ export default function App() {
       // Remove locally first for immediate responsiveness
       const updated = expenses.filter(e => e.id !== expenseId);
       setExpenses(updated);
-      localStorage.setItem('elite_beauty_expenses', JSON.stringify(updated));
+      saveLocal('expenses', updated);
 
       await deleteDoc(doc(db, 'expenses', expenseId));
     } catch (error) {
