@@ -302,7 +302,7 @@ export default function App() {
               if (key === 'products' && delIds.includes(item.id)) return false;
               if (!item.createdBy) return false;
               const creator = String(item.createdBy).toLowerCase();
-              return ADMIN_EMAILS.includes(creator);
+              return ADMIN_EMAILS.includes(creator) || creator.includes('system');
             });
           }
           setter(parsed);
@@ -370,14 +370,20 @@ export default function App() {
         .map(d => ({ ...d.data(), id: d.id } as Product))
         .filter(p => !delIds.includes(p.id))
         .filter(p => {
-          if (!p.createdBy) return false; // Hide legacy items to ensure "only manual admin" items show
-          const creator = p.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator);
+          if (!p.createdBy) return false;
+          const creator = String(p.createdBy).toLowerCase();
+          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
         });
       
-      setProducts(() => {
-        // STRICT: Only show cloud data that passed the deletion filter
-        const final = [...cloudData]
+      setProducts(prev => {
+        const mergedMap = new Map<string, Product>();
+        // Add existing (includes local-only)
+        prev.forEach(p => mergedMap.set(p.id, p));
+        // Overwrite with cloud version if exists
+        cloudData.forEach(p => mergedMap.set(p.id, p));
+        
+        const final = Array.from(mergedMap.values())
+          .filter(p => !delIds.includes(p.id))
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         saveLocal('products', final);
@@ -397,13 +403,14 @@ export default function App() {
         .filter((s: Sale) => {
           if (!s.createdBy) return false;
           const creator = s.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator);
+          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
         });
       setSales(prev => {
         const mergedMap = new Map<string, Sale>();
         prev.forEach(s => mergedMap.set(s.id, s));
         cloudData.forEach(s => mergedMap.set(s.id, s));
-        const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const final = Array.from(mergedMap.values())
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         saveLocal('sales', final);
         setIsSyncing(false);
         return final;
@@ -421,13 +428,14 @@ export default function App() {
         .filter((e: Expense) => {
           if (!e.createdBy) return false;
           const creator = e.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator);
+          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
         });
       setExpenses(prev => {
         const mergedMap = new Map<string, Expense>();
         prev.forEach(e => mergedMap.set(e.id, e));
         cloudData.forEach(e => mergedMap.set(e.id, e));
-        const final = Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const final = Array.from(mergedMap.values())
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         saveLocal('expenses', final);
         setIsSyncing(false);
         return final;
@@ -440,7 +448,14 @@ export default function App() {
     });
 
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
-      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      const cloudData = snapshot.docs
+        .map(d => ({ ...d.data(), id: d.id } as Customer))
+        .filter(c => {
+          if (!c.createdBy) return false;
+          const creator = c.createdBy.toLowerCase();
+          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
+        });
+
       setCustomers(prev => {
         const mergedMap = new Map<string, Customer>();
         prev.forEach(c => mergedMap.set(c.id, c));
