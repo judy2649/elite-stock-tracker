@@ -211,7 +211,7 @@ export default function DashboardOverview({
             </h3>
             <button 
               onClick={() => {
-                onSetProductFilter('low-stock');
+                onSetProductFilter('low');
                 onNavigateToTab('stock');
               }}
               className="text-xs text-royal-700 hover:text-royal-800 font-bold"
@@ -258,7 +258,7 @@ export default function DashboardOverview({
                       </span>
                       <button 
                         onClick={() => {
-                          onSetProductFilter('out-of-stock');
+                          onSetProductFilter('out');
                           onNavigateToTab('stock');
                         }}
                         className="p-1 px-2.5 text-xs font-semibold bg-zinc-900 text-white rounded hover:bg-zinc-800 shrink-0"
@@ -288,7 +288,7 @@ export default function DashboardOverview({
                       </div>
                       <button 
                         onClick={() => {
-                          onSetProductFilter('low-stock');
+                          onSetProductFilter('low');
                           onNavigateToTab('stock');
                         }}
                         className="p-1 px-2.5 text-xs font-semibold bg-royal-700 text-white rounded hover:bg-royal-800"

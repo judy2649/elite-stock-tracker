@@ -380,9 +380,12 @@ export default function ProductCatalog({
 
   // Dynamic filter products pool
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const name = p.name || '';
+    const sku = p.sku || '';
+    const desc = p.description || '';
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          desc.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
 
@@ -411,20 +414,6 @@ export default function ProductCatalog({
           <p className="text-gray-500 text-xs mt-1">Add, update, and inspect cosmetics stock quantities and formulas.</p>
         </div>
         <div className="flex flex-wrap gap-2.5 self-start md:self-auto">
-          {onForceSeed && (
-            <button
-              onClick={handleForceSeed}
-              disabled={seedLoading}
-              className={`px-3 py-2 border rounded-lg font-bold text-xs shadow-xs transition active:scale-95 flex items-center gap-1.5 ${
-                seedSuccess 
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-250' 
-                  : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-              }`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-blue-500 ${seedLoading ? 'animate-spin' : ''}`} />
-              {seedLoading ? 'Syncing Catalog...' : seedSuccess ? 'Original Cosmetics Restored ✓' : 'Sync / Restore default Cosmetics'}
-            </button>
-          )}
           <button
             onClick={openAddModal}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition active:scale-95 flex items-center gap-2 shadow-blue-200"
@@ -709,21 +698,6 @@ export default function ProductCatalog({
                   <td colSpan={9} className="p-10 text-center text-gray-400 bg-linear-to-b from-white to-rose-50/10">
                     <div className="max-w-md mx-auto space-y-3">
                       <p className="font-semibold text-gray-800 text-sm">No cosmetics found matching descriptions.</p>
-                      {products.length === 0 && onForceSeed && (
-                        <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-4 mt-2 space-y-2 text-left">
-                          <p className="text-[11px] text-amber-900 leading-normal">
-                            ⚠️ <strong>Skincare Catalog is Empty:</strong> It looks like your active database catalog has no products. You can instantly restore the 5 default skincare products shown in your stock report (including <strong>Organic Body Scrub</strong>, <strong>Glutathione Cleanser</strong>, <strong>PauDeLune</strong>, etc.) with a single click.
-                          </p>
-                          <button
-                            onClick={handleForceSeed}
-                            disabled={seedLoading}
-                            className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-md text-[10px] font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                            {seedLoading ? 'Syncing Cosmetics Catalog...' : 'Instantly Seed & Sync Skincare Catalog'}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </td>
                 </tr>

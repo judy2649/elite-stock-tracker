@@ -76,7 +76,8 @@ const ADMIN_EMAILS = [
   'admin@elitebeauty.com',
   'manager@elitebeauty.com',
   'sonya@elitebeauty.com',
-  'judith@elitebeauty.com'
+  'judith@elitebeauty.com',
+  'system admin'
 ].map(e => e.toLowerCase());
 
 export default function App() {
@@ -377,7 +378,7 @@ export default function App() {
       setProducts(() => {
         // STRICT: Only show cloud data that passed the deletion filter
         const final = [...cloudData]
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         saveLocal('products', final);
         setIsSyncing(false);
@@ -745,7 +746,7 @@ export default function App() {
   const NAVIGATION_ITEMS = [
     { key: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
     { key: 'pos', label: 'Point of Sale (POS)', icon: Receipt },
-    { key: 'stock', label: 'Inventory & Catalog', icon: Layers },
+    { key: 'stock', label: 'Inventory (Catalog)', icon: Layers },
     { key: 'history', label: 'Sales History', icon: History },
     { key: 'expenses', label: 'Expenses Register', icon: CircleDollarSign },
     { key: 'customers', label: 'Clients & Debts', icon: Users },
