@@ -55,6 +55,7 @@ export interface Sale {
   date: string;             // ISO date-time string
   verificationCode?: string; // Specific dynamic code generated for the overall purchase
   location?: 'kampala' | 'wandegeya' | 'entebbe'; // Outlet branch location
+  createdBy?: string;       // Admin email who recorded this sale
 }
 
 export interface Expense {
@@ -64,6 +65,7 @@ export interface Expense {
   category: 'Rent' | 'Electricity & Water' | 'Transport & Customs' | 'Marketing' | 'Packaging & Delivery' | 'Staff Wages' | 'Other';
   date: string;             // YYYY-MM-DD
   notes?: string;
+  createdBy?: string;       // Admin email who recorded this expense
 }
 
 export interface CategoryStats {
@@ -105,5 +107,6 @@ export interface Customer {
   address?: string;
   notes?: string;
   createdAt: string;
+  createdBy?: string;       // Admin email who added this customer
 }
 

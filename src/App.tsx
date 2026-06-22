@@ -28,6 +28,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  getDoc,
   query, 
   orderBy,
   getDocs
@@ -75,8 +76,7 @@ const ADMIN_EMAILS = [
   'admin@elitebeauty.com',
   'manager@elitebeauty.com',
   'sonya@elitebeauty.com',
-  'judith@elitebeauty.com',
-  'System Admin'
+  'judith@elitebeauty.com'
 ].map(e => e.toLowerCase());
 
 export default function App() {
@@ -188,133 +188,35 @@ export default function App() {
     enforceRoles();
   }, [user]);
 
-  // Auto-seed missing products added by sonyaesther8@gmail.com if not already present on Firestore
-  const seedMissingProducts = async () => {
-    const missingProducts: Product[] = [
-      {
-        id: 'prod-ski-261',
-        name: 'Glutathione Facial Cleanser',
-        category: 'Skin Care',
-        sku: 'EB-SKI-261',
-        costPrice: 25000,
-        sellingPrice: 35000,
-        quantity: 0,
-        safeLevel: 5,
-        expiryDate: '2028-06-30',
-        imageUrl: 'glutathione_cleanser',
-        description: 'Deeply cleanses, brightens, and refreshes skin. Formulated with high-quality Glutathione and Vitamin C.',
-        batchNumber: 'B26-2610',
-        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
-        createdBy: 'system@elitebeauty.com'
-      },
-      {
-        id: 'prod-ski-683',
-        name: 'Organic Body Scrub',
-        category: 'Skin Care',
-        sku: 'EB-SKI-683',
-        costPrice: 15000,
-        sellingPrice: 25000,
-        quantity: 12,
-        safeLevel: 5,
-        expiryDate: '2028-03-15',
-        imageUrl: 'skincare_scrub',
-        description: 'Exfoliating and skin smoothing natural body scrub infused with botanical extracts.',
-        batchNumber: 'B26-6589',
-        locationStocks: { kampala: 12, wandegeya: 0, entebbe: 0 },
-        createdBy: 'system@elitebeauty.com'
-      },
-      {
-        id: 'prod-ski-191',
-        name: 'Blemishcare Showergel /body wash',
-        category: 'Skin Care',
-        sku: 'EB-SKI-191',
-        costPrice: 40000,
-        sellingPrice: 55000,
-        quantity: 0,
-        safeLevel: 3,
-        expiryDate: '2027-12-01',
-        imageUrl: 'blemishcare_showergel',
-        description: 'Acne and spot clearing blemishcare shower gel body wash, ideal for glowing skin.',
-        batchNumber: 'B26-6258',
-        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
-        createdBy: 'system@elitebeauty.com'
-      },
-      {
-        id: 'prod-ski-832',
-        name: 'Sk duches showergel',
-        category: 'Skin Care',
-        sku: 'EB-SKI-832',
-        costPrice: 35000,
-        sellingPrice: 48000,
-        quantity: 0,
-        safeLevel: 3,
-        expiryDate: '2028-01-20',
-        imageUrl: 'skduches_showergel',
-        description: 'Luxurious gold royal shower gel with long-lasting enchanting scent.',
-        batchNumber: 'B26-5685',
-        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
-        createdBy: 'system@elitebeauty.com'
-      },
-      {
-        id: 'prod-ski-545',
-        name: 'PauDeLune showergel',
-        category: 'Skin Care',
-        sku: 'EB-SKI-545',
-        costPrice: 38000,
-        sellingPrice: 52000,
-        quantity: 0,
-        safeLevel: 3,
-        expiryDate: '2027-09-10',
-        imageUrl: 'paudelune_showergel',
-        description: 'Premium French spa aromatherapy body wash for intense skin hydration.',
-        batchNumber: 'B26-3742',
-        locationStocks: { kampala: 0, wandegeya: 0, entebbe: 0 },
-        createdBy: 'system@elitebeauty.com'
-      }
-    ];
-
-    // 1. Force sync to Local State & Storage first for absolute guarantee and instant view
-    const deletedJson = localStorage.getItem('elite_beauty_deleted_products');
-    let delIds: string[] = deletedJson ? JSON.parse(deletedJson) : [];
-    
-    // Explicitly restore Sonya's products if they were accidentally deleted
-    const sonyaIds = missingProducts.map(p => p.id);
-    const originalDelLen = delIds.length;
-    delIds = delIds.filter(id => !sonyaIds.includes(id));
-    
-    if (delIds.length !== originalDelLen) {
-      localStorage.setItem('elite_beauty_deleted_products', JSON.stringify(delIds));
-      setDeletedProductIds(delIds);
-    }
-
-    const missingFiltered = missingProducts.filter(p => !delIds.includes(p.id));
-
-    setProducts(prev => {
-      const filteredPrev = prev.filter(p => !missingFiltered.some(m => m.sku === p.sku) && !delIds.includes(p.id));
-      const merged = [...filteredPrev, ...missingFiltered];
-      localStorage.setItem('elite_beauty_products', JSON.stringify(merged));
-      return merged;
-    });
-
-    // 2. Synchronize to Firestore if online
-    if (isOnlineSyncEnabled && db && missingFiltered.length > 0) {
-      try {
-        console.log("Seeding Sonya's skincare products to Firestore...");
-        for (const prod of missingFiltered) {
-          const { id, ...data } = prod;
-          await setDoc(doc(db, 'products', id), data, { merge: true });
-        }
-        console.log("Successfully seeded/synced Sonya's missing products to Firestore.");
-      } catch (err) {
-        console.warn("Seeding Sonya's missing products to Firestore failed:", err);
-      }
-    }
-  };
-
+  // Database Cleanup: Remove seeded items if unauthorized
   useEffect(() => {
-    if (!user) return;
-    // Auto-seed on login to guarantee default setup
-    seedMissingProducts();
+    if (!user || !isFirebaseAvailable || !db) return;
+    
+    const cleanupSeededItems = async () => {
+      const seededIds = [
+        'prod-ski-261', 'prod-ski-683', 'prod-ski-191', 'prod-ski-832', 'prod-ski-545'
+      ];
+      
+      try {
+        for (const id of seededIds) {
+          const docRef = doc(db, 'products', id);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+             const data = snap.data() as Product;
+             const creator = (data.createdBy || '').toLowerCase();
+             // Only delete if it's the system user or lacks a valid admin tag
+             if (creator.includes('system') || !ADMIN_EMAILS.includes(creator)) {
+               console.log(`Cleaning up unwanted seeded doc: ${id}`);
+               await deleteDoc(docRef);
+             }
+          }
+        }
+      } catch (err) {
+        console.warn("Seeded items cleanup failed:", err);
+      }
+    };
+
+    cleanupSeededItems();
   }, [user]);
 
   // Background Auto-Reconnect for Admins (The "Always-On Sync" Assurance)
@@ -392,10 +294,15 @@ export default function App() {
       if (stored) {
         try {
           let parsed = JSON.parse(stored);
-          if (key === 'products') {
+          if (key === 'products' || key === 'sales' || key === 'expenses') {
             const delStored = localStorage.getItem('elite_beauty_deleted_products');
             const delIds: string[] = delStored ? JSON.parse(delStored) : [];
-            parsed = parsed.filter((item: any) => !delIds.includes(item.id));
+            parsed = parsed.filter((item: any) => {
+              if (key === 'products' && delIds.includes(item.id)) return false;
+              if (!item.createdBy) return false;
+              const creator = String(item.createdBy).toLowerCase();
+              return ADMIN_EMAILS.includes(creator);
+            });
           }
           setter(parsed);
         } catch (e) {}
@@ -410,11 +317,7 @@ export default function App() {
         try {
           const parsed = JSON.parse(stored);
           currentLocals = parsed.filter((item: any) => 
-            String(item.id).startsWith('local_') || 
-            String(item.id).startsWith('prod-') || 
-            String(item.id).startsWith('sale-') || 
-            String(item.id).startsWith('cust_') || 
-            String(item.id).startsWith('exp_')
+            String(item.id).startsWith('local_')
           );
         } catch (e) {}
       }
@@ -464,7 +367,12 @@ export default function App() {
 
       const cloudData = snapshot.docs
         .map(d => ({ ...d.data(), id: d.id } as Product))
-        .filter(p => !delIds.includes(p.id));
+        .filter(p => !delIds.includes(p.id))
+        .filter(p => {
+          if (!p.createdBy) return false; // Hide legacy items to ensure "only manual admin" items show
+          const creator = p.createdBy.toLowerCase();
+          return ADMIN_EMAILS.includes(creator);
+        });
       
       setProducts(() => {
         // STRICT: Only show cloud data that passed the deletion filter
@@ -483,7 +391,13 @@ export default function App() {
     });
 
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
-      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      const cloudData = snapshot.docs
+        .map(d => ({ ...d.data(), id: d.id } as Sale))
+        .filter((s: Sale) => {
+          if (!s.createdBy) return false;
+          const creator = s.createdBy.toLowerCase();
+          return ADMIN_EMAILS.includes(creator);
+        });
       setSales(prev => {
         const mergedMap = new Map<string, Sale>();
         prev.forEach(s => mergedMap.set(s.id, s));
@@ -501,7 +415,13 @@ export default function App() {
     });
 
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
-      const cloudData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+      const cloudData = snapshot.docs
+        .map(d => ({ ...d.data(), id: d.id } as Expense))
+        .filter((e: Expense) => {
+          if (!e.createdBy) return false;
+          const creator = e.createdBy.toLowerCase();
+          return ADMIN_EMAILS.includes(creator);
+        });
       setExpenses(prev => {
         const mergedMap = new Map<string, Expense>();
         prev.forEach(e => mergedMap.set(e.id, e));
@@ -577,6 +497,7 @@ export default function App() {
     const enableOutOfStock = true;
     const adminEmails = [
       'sonyaesther8@gmail.com', 
+      'sonyaesther8@gmaoil.com',
       'islamnakibinge@gmail.com', 
       'judithoyoo64@gmail.com',
       'nakibingei@gmail.com',
@@ -671,7 +592,11 @@ export default function App() {
     const optimisticId = newSale.id.startsWith('local_') || newSale.id.startsWith('sale-')
       ? newSale.id
       : `local_sale_${Date.now()}`;
-    const optSale = { ...newSale, id: optimisticId };
+    const optSale = { 
+      ...newSale, 
+      id: optimisticId,
+      createdBy: user?.email || 'System Admin'
+    };
 
     // Update sales and products state & localStorage optimistically
     const updatedSales = [optSale, ...sales];
@@ -749,7 +674,11 @@ export default function App() {
     const optimisticId = newCustomer.id.startsWith('local_') || newCustomer.id.startsWith('cust_')
       ? newCustomer.id
       : `local_cust_${Date.now()}`;
-    const optCust = { ...newCustomer, id: optimisticId };
+    const optCust = { 
+      ...newCustomer, 
+      id: optimisticId,
+      createdBy: user?.email || 'System Admin'
+    };
 
     const updated = [...customers, optCust];
     setCustomers(updated);
@@ -768,7 +697,11 @@ export default function App() {
     const optimisticId = newExpense.id.startsWith('local_') || newExpense.id.startsWith('exp_')
       ? newExpense.id
       : `local_exp_${Date.now()}`;
-    const optExp = { ...newExpense, id: optimisticId };
+    const optExp = { 
+      ...newExpense, 
+      id: optimisticId,
+      createdBy: user?.email || 'System Admin'
+    };
 
     const updated = [...expenses, optExp];
     setExpenses(updated);
@@ -972,7 +905,6 @@ export default function App() {
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
               initialFilterClass={productFilterClass}
-              onForceSeed={seedMissingProducts}
             />
           )}
 

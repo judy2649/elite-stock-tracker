@@ -59,7 +59,6 @@ interface ProductCatalogProps {
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   initialFilterClass?: string;
-  onForceSeed?: () => Promise<void>;
 }
 
 export default function ProductCatalog({
@@ -69,27 +68,8 @@ export default function ProductCatalog({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
-  initialFilterClass = 'all',
-  onForceSeed
+  initialFilterClass = 'all'
 }: ProductCatalogProps) {
-  const [seedLoading, setSeedLoading] = useState(false);
-  const [seedSuccess, setSeedSuccess] = useState(false);
-
-  const handleForceSeed = async () => {
-    if (!onForceSeed) return;
-    setSeedLoading(true);
-    setSeedSuccess(false);
-    try {
-      await onForceSeed();
-      setSeedSuccess(true);
-      setTimeout(() => setSeedSuccess(false), 3000);
-    } catch (e) {
-      console.error("Force seeding failed:", e);
-    } finally {
-      setSeedLoading(false);
-    }
-  };
-  // Navigation view mode for the admin
   const [catalogViewMode, setCatalogViewMode] = useState<'catalog' | 'sold-vs-remaining'>('catalog');
 
   // Quick direct sale (bought item entry) state
