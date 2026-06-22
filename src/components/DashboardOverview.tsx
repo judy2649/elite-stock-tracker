@@ -388,6 +388,48 @@ export default function DashboardOverview({
 
       </div>
 
+      {/* Recent Success Transactions (Real-time Feed) */}
+      <div className="bg-white rounded-xl border border-zinc-200 p-5 shadow-xs">
+        <div className="flex items-center justify-between border-b border-zinc-150 pb-3 mb-4">
+          <h3 className="font-display text-lg font-semibold text-zinc-900 flex items-center gap-2">
+            <Calendar className="w-4.5 h-4.5 text-emerald-600" />
+            Recent Changes (Real-time Audit)
+          </h3>
+          <button 
+            onClick={() => onNavigateToTab('history')}
+            className="text-xs text-royal-700 hover:text-royal-800 font-bold"
+          >
+            View Full Sales History →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-2">
+          {sales.length === 0 ? (
+            <div className="col-span-2 py-8 text-center text-zinc-400 text-sm">
+              No recent transactions found.
+            </div>
+          ) : (
+            sales.slice(0, 6).map((sale) => (
+              <div key={sale.id} className="flex items-center justify-between py-2 border-b border-zinc-50 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-50 rounded-lg border border-zinc-100 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-900">{sale.customerName || 'Walk-in Sale'}</h4>
+                    <p className="text-[10px] text-zinc-500 font-mono">{sale.invoiceNumber} • {new Date(sale.date).toLocaleDateString()} {new Date(sale.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block text-sm font-bold text-zinc-900">{formatUGX(sale.totalAmount)}</span>
+                  <span className={`text-[10px] font-bold ${sale.paymentMethod === 'Cash' ? 'text-zinc-500' : 'text-royal-600'}`}>{sale.paymentMethod}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* Quick Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div 

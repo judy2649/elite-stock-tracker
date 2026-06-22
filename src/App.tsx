@@ -39,6 +39,7 @@ import ProductCatalog from './components/ProductCatalog';
 import ExpenseTracker from './components/ExpenseTracker';
 import CustomerLedger from './components/CustomerLedger';
 import AnalyticsPanel from './components/AnalyticsPanel';
+import SalesHistory from './components/SalesHistory';
 import EmailAlertsSettings from './components/EmailAlertsSettings';
 import Auth from './components/Auth';
 // @ts-ignore
@@ -826,6 +827,7 @@ export default function App() {
     { key: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
     { key: 'pos', label: 'Point of Sale (POS)', icon: Receipt },
     { key: 'stock', label: 'Inventory & Catalog', icon: Layers },
+    { key: 'history', label: 'Sales History', icon: History },
     { key: 'expenses', label: 'Expenses Register', icon: CircleDollarSign },
     { key: 'customers', label: 'Clients & Debts', icon: Users },
     { key: 'alerts', label: 'Admin Alert Center', icon: BellRing },
@@ -985,6 +987,12 @@ export default function App() {
               onDeleteProduct={handleDeleteProduct}
               initialFilterClass={productFilterClass}
               onForceSeed={seedMissingProducts}
+            />
+          )}
+
+          {activeTab === 'history' && (
+            <SalesHistory 
+              sales={sales}
             />
           )}
 
