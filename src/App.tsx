@@ -189,35 +189,12 @@ export default function App() {
     enforceRoles();
   }, [user]);
 
-  // Database Cleanup: Remove seeded items if unauthorized
+  // Database Cleanup removed to ensure shared visibility
   useEffect(() => {
-    if (!user || !isFirebaseAvailable || !db) return;
-    
-    const cleanupSeededItems = async () => {
-      const seededIds = [
-        'prod-ski-261', 'prod-ski-683', 'prod-ski-191', 'prod-ski-832', 'prod-ski-545'
-      ];
-      
-      try {
-        for (const id of seededIds) {
-          const docRef = doc(db, 'products', id);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-             const data = snap.data() as Product;
-             const creator = (data.createdBy || '').toLowerCase();
-             // Only delete if it's the system user or lacks a valid admin tag
-             if (creator.includes('system') || !ADMIN_EMAILS.includes(creator)) {
-               console.log(`Cleaning up unwanted seeded doc: ${id}`);
-               await deleteDoc(docRef);
-             }
-          }
-        }
-      } catch (err) {
-        console.warn("Seeded items cleanup failed:", err);
-      }
-    };
-
-    cleanupSeededItems();
+    // Ensuring sync state is ready
+    if (user && isFirebaseAvailable) {
+       setIsSyncing(false);
+    }
   }, [user]);
 
   // Background Auto-Reconnect for Admins (The "Always-On Sync" Assurance)
@@ -295,14 +272,14 @@ export default function App() {
       if (stored) {
         try {
           let parsed = JSON.parse(stored);
-          if (key === 'products' || key === 'sales' || key === 'expenses') {
+          if (key === 'products' || key === 'sales' || key === 'expenses' || key === 'customers') {
             const delStored = localStorage.getItem('elite_beauty_deleted_products');
             const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+            const userEmail = (user?.email || '').toLowerCase();
+
             parsed = parsed.filter((item: any) => {
               if (key === 'products' && delIds.includes(item.id)) return false;
-              if (!item.createdBy) return false;
-              const creator = String(item.createdBy).toLowerCase();
-              return ADMIN_EMAILS.includes(creator) || creator.includes('system');
+              return true; // Show all items in local storage if not explicitly deleted
             });
           }
           setter(parsed);
@@ -365,15 +342,11 @@ export default function App() {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const delStored = localStorage.getItem('elite_beauty_deleted_products');
       const delIds: string[] = delStored ? JSON.parse(delStored) : [];
+      const userEmail = (user?.email || '').toLowerCase();
 
       const cloudData = snapshot.docs
         .map(d => ({ ...d.data(), id: d.id } as Product))
-        .filter(p => !delIds.includes(p.id))
-        .filter(p => {
-          if (!p.createdBy) return false;
-          const creator = String(p.createdBy).toLowerCase();
-          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
-        });
+        .filter(p => !delIds.includes(p.id));
       
       setProducts(prev => {
         const mergedMap = new Map<string, Product>();
@@ -399,12 +372,7 @@ export default function App() {
 
     const unsubSales = onSnapshot(query(collection(db, 'sales'), orderBy('date', 'desc')), (snapshot) => {
       const cloudData = snapshot.docs
-        .map(d => ({ ...d.data(), id: d.id } as Sale))
-        .filter((s: Sale) => {
-          if (!s.createdBy) return false;
-          const creator = s.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
-        });
+        .map(d => ({ ...d.data(), id: d.id } as Sale));
       setSales(prev => {
         const mergedMap = new Map<string, Sale>();
         prev.forEach(s => mergedMap.set(s.id, s));
@@ -424,12 +392,7 @@ export default function App() {
 
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
       const cloudData = snapshot.docs
-        .map(d => ({ ...d.data(), id: d.id } as Expense))
-        .filter((e: Expense) => {
-          if (!e.createdBy) return false;
-          const creator = e.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
-        });
+        .map(d => ({ ...d.data(), id: d.id } as Expense));
       setExpenses(prev => {
         const mergedMap = new Map<string, Expense>();
         prev.forEach(e => mergedMap.set(e.id, e));
@@ -449,12 +412,7 @@ export default function App() {
 
     const unsubCustomers = onSnapshot(query(collection(db, 'customers'), orderBy('name', 'asc')), (snapshot) => {
       const cloudData = snapshot.docs
-        .map(d => ({ ...d.data(), id: d.id } as Customer))
-        .filter(c => {
-          if (!c.createdBy) return false;
-          const creator = c.createdBy.toLowerCase();
-          return ADMIN_EMAILS.includes(creator) || creator.includes('system');
-        });
+        .map(d => ({ ...d.data(), id: d.id } as Customer));
 
       setCustomers(prev => {
         const mergedMap = new Map<string, Customer>();
