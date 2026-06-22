@@ -12,7 +12,8 @@ import {
   Menu, 
   X,
   BellRing,
-  LogOut
+  LogOut,
+  History
 } from 'lucide-react';
 
 import { auth, db, handleFirestoreError, OperationType, isFirebaseAvailable } from './lib/firebase';
