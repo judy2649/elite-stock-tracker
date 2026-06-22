@@ -395,16 +395,7 @@ export default function App() {
           if (key === 'products') {
             const delStored = localStorage.getItem('elite_beauty_deleted_products');
             const delIds: string[] = delStored ? JSON.parse(delStored) : [];
-            parsed = parsed.filter((item: any) => {
-              const notDeleted = !delIds.includes(item.id);
-              if (!notDeleted) return false;
-              // If we have a creator tag, it MUST be an admin or system
-              if (item.createdBy) {
-                const creator = item.createdBy.toLowerCase();
-                return ADMIN_EMAILS.includes(creator) || creator === 'system@elitebeauty.com' || creator === 'system admin';
-              }
-              return true; // Legacy items are trusted
-            });
+            parsed = parsed.filter((item: any) => !delIds.includes(item.id));
           }
           setter(parsed);
         } catch (e) {}
