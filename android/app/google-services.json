@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "220986712273",
+    "firebase_url": "https://elite-stock-tracker-default-rtdb.firebaseio.com",
+    "project_id": "elite-stock-tracker",
+    "storage_bucket": "elite-stock-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:220986712273:android:d6e9c77f76ff26ecafa5f0",
+        "android_client_info": {
+          "package_name": "com.elitebeuty.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "220986712273-ac9s388sqtqhhiu99oc7gnn7i8vbot14.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsHV-nYJB22XMi7UI-E9OSMSbWwh6OHzo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "220986712273-ac9s388sqtqhhiu99oc7gnn7i8vbot14.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
